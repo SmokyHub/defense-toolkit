@@ -5,6 +5,14 @@ frontend build or npm step. No emulator, Frida software/server, ADB, wheelhouse 
 is included. `runtime_code/backends/` contains the application's instrumentation adapter source;
 it is not a bundled Frida installation.
 
+macOS host support uses `psutil` for process discovery instead of Linux `/proc`, retaining
+the same per-target collector lock. Install the live requirements below with Python 3.12;
+the launcher automatically uses `.venvs/runtime/bin/python` when present. An explicit
+`RUNTIME_CODE_PYTHON` overrides that choice. Host compatibility paths have regression tests;
+a complete macOS-to-Android live capture has not been validated in this lab.
+ADB must be installed separately and available on `PATH`. Supply an **Android** Frida server
+matching the phone's ABI, even when the host is an Apple Silicon Mac.
+
 ## Browse saved evidence
 
 Copy the entire saved store directory from the original PC after stopping its collector/server
@@ -36,12 +44,12 @@ These server files must be supplied separately. The live host requirements are d
 
 ```bash
 # On the destination PC, install dependencies separately if needed:
-python3 -m venv .venvs/runtime
+python3.12 -m venv .venvs/runtime
 .venvs/runtime/bin/python -m pip install -r requirements-live-optional.txt
 export RUNTIME_CODE_PYTHON="$PWD/.venvs/runtime/bin/python"
 
 # Optional automatic static DEX/URL indexing:
-python3 -m venv .venvs/analysis
+python3.12 -m venv .venvs/analysis
 .venvs/analysis/bin/python -m pip install -r requirements-analysis.txt
 
 adb -s 33011FDH20018E install -r test-apk/runtime-flow.apk
@@ -82,3 +90,6 @@ events. Unknown ART/linker profiles and unavailable access fail explicitly.
 Without static dependencies use `--no-static`. You can set `RUNTIME_CODE_ANALYSIS_PYTHON` to
 an existing interpreter with Androguard instead of creating `.venvs/analysis`.
 See `docs/` for exact supported coverage; paths there refer to the original lab layout.
+On macOS the optional static index worker applies CPU/output limits and bounded input and
+evaluation, plus the host's 60-second timeout; it cannot enforce Linux's hard address-space
+limit. This limitation is included in each successful index result.

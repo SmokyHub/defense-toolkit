@@ -10,6 +10,28 @@ Captured code is evidence of an observed state, not evidence of maliciousness or
 
 ## Run it
 
+### macOS host setup
+
+Use Python 3.12 and install the host dependencies in a local environment from the repository root:
+
+```bash
+python3.12 -m venv .venvs/runtime
+.venvs/runtime/bin/python -m pip install -r scripts/portable/website/requirements-live-optional.txt
+scripts/runtime-code watch --device 33011FDH20018E --app lab.runtimecode.flow
+```
+
+Install ADB separately on `PATH` and supply the matching Android Frida server as described
+in the live workflow. The portable website has its own requirements file and launcher;
+see its README for commands relative to that directory. `RUNTIME_CODE_PYTHON` can select
+another interpreter. macOS uses psutil to inspect same-user collectors without `/proc`;
+the per-target file lock remains active. Device-side `/proc` queries still run on Android.
+Plugin discovery accepts both older Python entry-point mappings and newer selectable APIs.
+Linux is the live-tested host; macOS paths have host regression tests, with full live capture
+on a Mac still unvalidated. Optional static indexing retains CPU/output/input/evaluation and
+wall-time limits on macOS, but has no hard address-space limit; results report this limitation.
+
+### Android capture
+
 For the verified Pixel 7 Java-input trial using an isolated stock Frida 17.18.0 server,
 see [Pixel capture instructions](runtime-code-pixel.md). This is separate from Florida validation.
 

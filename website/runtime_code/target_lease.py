@@ -3,24 +3,43 @@ import fcntl
 import hashlib
 import json
 import os
+import sys
 from pathlib import Path
 
 
-def legacy_collectors(app,device,proc=Path('/proc')):
+def _host_processes(proc=None):
+    """Yield same-user argv without requiring procfs on the macOS host."""
+    if proc is None and sys.platform == 'darwin':
+        try:
+            import psutil
+        except ImportError as error:
+            raise ValueError('macOS live capture requires psutil; install the website requirements-live-optional.txt with your runtime Python') from error
+        for process in psutil.process_iter():
+            try:
+                if process.pid != os.getpid() and process.uids().real == os.getuid():
+                    yield process.pid, process.cmdline()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+        return
+    proc = Path('/proc') if proc is None else Path(proc)
+    for entry in proc.iterdir():
+        if not entry.name.isdigit() or int(entry.name)==os.getpid():continue
+        try:
+            if entry.stat().st_uid!=os.getuid():continue
+            yield int(entry.name),(entry/'cmdline').read_bytes().decode(errors='replace').split('\0')
+        except (OSError,ValueError):continue
+
+
+def legacy_collectors(app,device,proc=None):
     matches=[]
     def option(args,name):
         for i,value in enumerate(args):
             if value==name and i+1<len(args):return args[i+1]
             if value.startswith(name+'='):return value.split('=',1)[1]
-    for entry in proc.iterdir():
-        if not entry.name.isdigit() or int(entry.name)==os.getpid():continue
-        try:
-            if entry.stat().st_uid!=os.getuid():continue
-            args=(entry/'cmdline').read_bytes().decode(errors='replace').split('\0')
-            if not any(args[i:i+2]==['-m','runtime_code'] for i in range(len(args)-1)):continue
-            if not any(c in args for c in ('watch','capture')):continue
-            if option(args,'--app')==app and option(args,'--device')==device:matches.append(int(entry.name))
-        except (OSError,ValueError):continue
+    for pid,args in _host_processes(proc):
+        if not any(args[i:i+2]==['-m','runtime_code'] for i in range(len(args)-1)):continue
+        if not any(c in args for c in ('watch','capture')):continue
+        if option(args,'--app')==app and option(args,'--device')==device:matches.append(pid)
     return matches
 
 

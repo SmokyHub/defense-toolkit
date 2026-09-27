@@ -5,7 +5,7 @@ from pathlib import Path
 import struct
 import time
 import zlib
-from importlib.metadata import entry_points
+from .plugins import group_entry_points
 
 from .store import identity, encoded, export_directory
 
@@ -249,7 +249,7 @@ HANDLERS = {'structure': structure, 'code.references': references}
 
 
 def discover_handlers():
-    for plugin in entry_points(group='runtime_code.analysis_handlers'):
+    for plugin in group_entry_points('runtime_code.analysis_handlers'):
         if plugin.name not in HANDLERS:register_handler(plugin.name,plugin.load())
     return HANDLERS
 

@@ -2,4 +2,8 @@
 set -euo pipefail
 WEBSITE_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 cd "$WEBSITE_ROOT"
-exec "${RUNTIME_CODE_PYTHON:-python3}" -m runtime_code "$@"
+INTERPRETER="${RUNTIME_CODE_PYTHON:-python3}"
+if [[ -z "${RUNTIME_CODE_PYTHON:-}" && -x "$WEBSITE_ROOT/.venvs/runtime/bin/python" ]]; then
+  INTERPRETER="$WEBSITE_ROOT/.venvs/runtime/bin/python"
+fi
+exec "$INTERPRETER" -m runtime_code "$@"

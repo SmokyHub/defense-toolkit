@@ -243,14 +243,28 @@ class Index:
              'Constant evaluation stops on unknown branches and unmodeled instructions; no universal StringFog/reflective resolution',
              'No native/Dart/JavaScript bodies; method dispatch and cross-DEX helper evaluation may remain unresolved']}
 
-if __name__=='__main__':
+def worker_limits():
+    """Keep CPU/output limits on both hosts; Darwin has no reliable RLIMIT_AS cap."""
     import resource
-    resource.setrlimit(resource.RLIMIT_AS,(2*1024**3,2*1024**3));resource.setrlimit(resource.RLIMIT_CPU,(45,45))
+    limitations=[]
+    if sys.platform == 'darwin':
+        limitations.append('macOS worker has no hard address-space limit; input, evaluation, CPU, output and host timeout limits still apply')
+    else:
+        resource.setrlimit(resource.RLIMIT_AS,(2*1024**3,2*1024**3))
+    resource.setrlimit(resource.RLIMIT_CPU,(45,45))
     resource.setrlimit(resource.RLIMIT_FSIZE,(32*1024**2,32*1024**2))
+    return limitations
+
+
+if __name__=='__main__':
     try:
+        limitations=worker_limits()
         from pathlib import Path
-        data=Path(sys.argv[1]).read_bytes()
+        with Path(sys.argv[1]).open('rb') as source:
+            data=source.read(64*1024**2+1)
         if len(data)>64*1024**2:raise Unsupported('DEX byte limit')
-        print(json.dumps(Index(data).result(),ensure_ascii=True))
+        result=Index(data).result()
+        result['limitations'].extend(limitations)
+        print(json.dumps(result,ensure_ascii=True))
     except Exception as error:
         print(json.dumps({'format':'code-references/v1','validity':'failed','diagnostic':str(error)}));sys.exit(1)

@@ -1,3 +1,4 @@
 # Only needed for live instrumentation; no Frida runtime/server is bundled.
 frida==17.18.0
 frida-tools==14.10.4
+psutil>=5.9,<8; sys_platform == "darwin"
