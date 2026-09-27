@@ -1,0 +1,9 @@
+{
+ "format": "runtime-code.pack/v1", "id": "lab.java-and-art",
+ "limits": {"queue_depth": 128},
+ "tokens": [
+   {"name": "caller-dex-buffers", "capability": "dex.input.java", "mode": "extract", "trigger": "load", "handlers": ["structure"]},
+   {"name": "art-inputs", "capability": "dex.input.art", "mode": "extract", "trigger": "load",
+    "selection": {"exclude_prefixes": ["/system/", "/apex/"]}, "handlers": ["structure"]}
+ ]
+}

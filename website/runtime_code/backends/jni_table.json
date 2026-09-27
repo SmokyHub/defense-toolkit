@@ -1,0 +1,1151 @@
+{
+  "source": "Android NDK 27.0.12077973 jni.h; standard JNINativeInterface order",
+  "header_sha256": "5df9074457c041b372f2c68ff646d6e8600cd673a223885e8df21c44c94ec667",
+  "functions": [
+    {
+      "index": 4,
+      "name": "GetVersion",
+      "signature": "jint GetVersion(JNIEnv *)"
+    },
+    {
+      "index": 5,
+      "name": "DefineClass",
+      "signature": "jclass DefineClass(JNIEnv*, const char*, jobject, const jbyte*, jsize)"
+    },
+    {
+      "index": 6,
+      "name": "FindClass",
+      "signature": "jclass FindClass(JNIEnv*, const char*)"
+    },
+    {
+      "index": 7,
+      "name": "FromReflectedMethod",
+      "signature": "jmethodID FromReflectedMethod(JNIEnv*, jobject)"
+    },
+    {
+      "index": 8,
+      "name": "FromReflectedField",
+      "signature": "jfieldID FromReflectedField(JNIEnv*, jobject)"
+    },
+    {
+      "index": 9,
+      "name": "ToReflectedMethod",
+      "signature": "jobject ToReflectedMethod(JNIEnv*, jclass, jmethodID, jboolean)"
+    },
+    {
+      "index": 10,
+      "name": "GetSuperclass",
+      "signature": "jclass GetSuperclass(JNIEnv*, jclass)"
+    },
+    {
+      "index": 11,
+      "name": "IsAssignableFrom",
+      "signature": "jboolean IsAssignableFrom(JNIEnv*, jclass, jclass)"
+    },
+    {
+      "index": 12,
+      "name": "ToReflectedField",
+      "signature": "jobject ToReflectedField(JNIEnv*, jclass, jfieldID, jboolean)"
+    },
+    {
+      "index": 13,
+      "name": "Throw",
+      "signature": "jint Throw(JNIEnv*, jthrowable)"
+    },
+    {
+      "index": 14,
+      "name": "ThrowNew",
+      "signature": "jint ThrowNew(JNIEnv *, jclass, const char *)"
+    },
+    {
+      "index": 15,
+      "name": "ExceptionOccurred",
+      "signature": "jthrowable ExceptionOccurred(JNIEnv*)"
+    },
+    {
+      "index": 16,
+      "name": "ExceptionDescribe",
+      "signature": "void ExceptionDescribe(JNIEnv*)"
+    },
+    {
+      "index": 17,
+      "name": "ExceptionClear",
+      "signature": "void ExceptionClear(JNIEnv*)"
+    },
+    {
+      "index": 18,
+      "name": "FatalError",
+      "signature": "void FatalError(JNIEnv*, const char*)"
+    },
+    {
+      "index": 19,
+      "name": "PushLocalFrame",
+      "signature": "jint PushLocalFrame(JNIEnv*, jint)"
+    },
+    {
+      "index": 20,
+      "name": "PopLocalFrame",
+      "signature": "jobject PopLocalFrame(JNIEnv*, jobject)"
+    },
+    {
+      "index": 21,
+      "name": "NewGlobalRef",
+      "signature": "jobject NewGlobalRef(JNIEnv*, jobject)"
+    },
+    {
+      "index": 22,
+      "name": "DeleteGlobalRef",
+      "signature": "void DeleteGlobalRef(JNIEnv*, jobject)"
+    },
+    {
+      "index": 23,
+      "name": "DeleteLocalRef",
+      "signature": "void DeleteLocalRef(JNIEnv*, jobject)"
+    },
+    {
+      "index": 24,
+      "name": "IsSameObject",
+      "signature": "jboolean IsSameObject(JNIEnv*, jobject, jobject)"
+    },
+    {
+      "index": 25,
+      "name": "NewLocalRef",
+      "signature": "jobject NewLocalRef(JNIEnv*, jobject)"
+    },
+    {
+      "index": 26,
+      "name": "EnsureLocalCapacity",
+      "signature": "jint EnsureLocalCapacity(JNIEnv*, jint)"
+    },
+    {
+      "index": 27,
+      "name": "AllocObject",
+      "signature": "jobject AllocObject(JNIEnv*, jclass)"
+    },
+    {
+      "index": 28,
+      "name": "NewObject",
+      "signature": "jobject NewObject(JNIEnv*, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 29,
+      "name": "NewObjectV",
+      "signature": "jobject NewObjectV(JNIEnv*, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 30,
+      "name": "NewObjectA",
+      "signature": "jobject NewObjectA(JNIEnv*, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 31,
+      "name": "GetObjectClass",
+      "signature": "jclass GetObjectClass(JNIEnv*, jobject)"
+    },
+    {
+      "index": 32,
+      "name": "IsInstanceOf",
+      "signature": "jboolean IsInstanceOf(JNIEnv*, jobject, jclass)"
+    },
+    {
+      "index": 33,
+      "name": "GetMethodID",
+      "signature": "jmethodID GetMethodID(JNIEnv*, jclass, const char*, const char*)"
+    },
+    {
+      "index": 34,
+      "name": "CallObjectMethod",
+      "signature": "jobject CallObjectMethod(JNIEnv*, jobject, jmethodID, ...)"
+    },
+    {
+      "index": 35,
+      "name": "CallObjectMethodV",
+      "signature": "jobject CallObjectMethodV(JNIEnv*, jobject, jmethodID, va_list)"
+    },
+    {
+      "index": 36,
+      "name": "CallObjectMethodA",
+      "signature": "jobject CallObjectMethodA(JNIEnv*, jobject, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 37,
+      "name": "CallBooleanMethod",
+      "signature": "jboolean CallBooleanMethod(JNIEnv*, jobject, jmethodID, ...)"
+    },
+    {
+      "index": 38,
+      "name": "CallBooleanMethodV",
+      "signature": "jboolean CallBooleanMethodV(JNIEnv*, jobject, jmethodID, va_list)"
+    },
+    {
+      "index": 39,
+      "name": "CallBooleanMethodA",
+      "signature": "jboolean CallBooleanMethodA(JNIEnv*, jobject, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 40,
+      "name": "CallByteMethod",
+      "signature": "jbyte CallByteMethod(JNIEnv*, jobject, jmethodID, ...)"
+    },
+    {
+      "index": 41,
+      "name": "CallByteMethodV",
+      "signature": "jbyte CallByteMethodV(JNIEnv*, jobject, jmethodID, va_list)"
+    },
+    {
+      "index": 42,
+      "name": "CallByteMethodA",
+      "signature": "jbyte CallByteMethodA(JNIEnv*, jobject, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 43,
+      "name": "CallCharMethod",
+      "signature": "jchar CallCharMethod(JNIEnv*, jobject, jmethodID, ...)"
+    },
+    {
+      "index": 44,
+      "name": "CallCharMethodV",
+      "signature": "jchar CallCharMethodV(JNIEnv*, jobject, jmethodID, va_list)"
+    },
+    {
+      "index": 45,
+      "name": "CallCharMethodA",
+      "signature": "jchar CallCharMethodA(JNIEnv*, jobject, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 46,
+      "name": "CallShortMethod",
+      "signature": "jshort CallShortMethod(JNIEnv*, jobject, jmethodID, ...)"
+    },
+    {
+      "index": 47,
+      "name": "CallShortMethodV",
+      "signature": "jshort CallShortMethodV(JNIEnv*, jobject, jmethodID, va_list)"
+    },
+    {
+      "index": 48,
+      "name": "CallShortMethodA",
+      "signature": "jshort CallShortMethodA(JNIEnv*, jobject, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 49,
+      "name": "CallIntMethod",
+      "signature": "jint CallIntMethod(JNIEnv*, jobject, jmethodID, ...)"
+    },
+    {
+      "index": 50,
+      "name": "CallIntMethodV",
+      "signature": "jint CallIntMethodV(JNIEnv*, jobject, jmethodID, va_list)"
+    },
+    {
+      "index": 51,
+      "name": "CallIntMethodA",
+      "signature": "jint CallIntMethodA(JNIEnv*, jobject, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 52,
+      "name": "CallLongMethod",
+      "signature": "jlong CallLongMethod(JNIEnv*, jobject, jmethodID, ...)"
+    },
+    {
+      "index": 53,
+      "name": "CallLongMethodV",
+      "signature": "jlong CallLongMethodV(JNIEnv*, jobject, jmethodID, va_list)"
+    },
+    {
+      "index": 54,
+      "name": "CallLongMethodA",
+      "signature": "jlong CallLongMethodA(JNIEnv*, jobject, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 55,
+      "name": "CallFloatMethod",
+      "signature": "jfloat CallFloatMethod(JNIEnv*, jobject, jmethodID, ...)"
+    },
+    {
+      "index": 56,
+      "name": "CallFloatMethodV",
+      "signature": "jfloat CallFloatMethodV(JNIEnv*, jobject, jmethodID, va_list)"
+    },
+    {
+      "index": 57,
+      "name": "CallFloatMethodA",
+      "signature": "jfloat CallFloatMethodA(JNIEnv*, jobject, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 58,
+      "name": "CallDoubleMethod",
+      "signature": "jdouble CallDoubleMethod(JNIEnv*, jobject, jmethodID, ...)"
+    },
+    {
+      "index": 59,
+      "name": "CallDoubleMethodV",
+      "signature": "jdouble CallDoubleMethodV(JNIEnv*, jobject, jmethodID, va_list)"
+    },
+    {
+      "index": 60,
+      "name": "CallDoubleMethodA",
+      "signature": "jdouble CallDoubleMethodA(JNIEnv*, jobject, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 61,
+      "name": "CallVoidMethod",
+      "signature": "void CallVoidMethod(JNIEnv*, jobject, jmethodID, ...)"
+    },
+    {
+      "index": 62,
+      "name": "CallVoidMethodV",
+      "signature": "void CallVoidMethodV(JNIEnv*, jobject, jmethodID, va_list)"
+    },
+    {
+      "index": 63,
+      "name": "CallVoidMethodA",
+      "signature": "void CallVoidMethodA(JNIEnv*, jobject, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 64,
+      "name": "CallNonvirtualObjectMethod",
+      "signature": "jobject CallNonvirtualObjectMethod(JNIEnv*, jobject, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 65,
+      "name": "CallNonvirtualObjectMethodV",
+      "signature": "jobject CallNonvirtualObjectMethodV(JNIEnv*, jobject, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 66,
+      "name": "CallNonvirtualObjectMethodA",
+      "signature": "jobject CallNonvirtualObjectMethodA(JNIEnv*, jobject, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 67,
+      "name": "CallNonvirtualBooleanMethod",
+      "signature": "jboolean CallNonvirtualBooleanMethod(JNIEnv*, jobject, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 68,
+      "name": "CallNonvirtualBooleanMethodV",
+      "signature": "jboolean CallNonvirtualBooleanMethodV(JNIEnv*, jobject, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 69,
+      "name": "CallNonvirtualBooleanMethodA",
+      "signature": "jboolean CallNonvirtualBooleanMethodA(JNIEnv*, jobject, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 70,
+      "name": "CallNonvirtualByteMethod",
+      "signature": "jbyte CallNonvirtualByteMethod(JNIEnv*, jobject, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 71,
+      "name": "CallNonvirtualByteMethodV",
+      "signature": "jbyte CallNonvirtualByteMethodV(JNIEnv*, jobject, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 72,
+      "name": "CallNonvirtualByteMethodA",
+      "signature": "jbyte CallNonvirtualByteMethodA(JNIEnv*, jobject, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 73,
+      "name": "CallNonvirtualCharMethod",
+      "signature": "jchar CallNonvirtualCharMethod(JNIEnv*, jobject, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 74,
+      "name": "CallNonvirtualCharMethodV",
+      "signature": "jchar CallNonvirtualCharMethodV(JNIEnv*, jobject, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 75,
+      "name": "CallNonvirtualCharMethodA",
+      "signature": "jchar CallNonvirtualCharMethodA(JNIEnv*, jobject, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 76,
+      "name": "CallNonvirtualShortMethod",
+      "signature": "jshort CallNonvirtualShortMethod(JNIEnv*, jobject, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 77,
+      "name": "CallNonvirtualShortMethodV",
+      "signature": "jshort CallNonvirtualShortMethodV(JNIEnv*, jobject, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 78,
+      "name": "CallNonvirtualShortMethodA",
+      "signature": "jshort CallNonvirtualShortMethodA(JNIEnv*, jobject, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 79,
+      "name": "CallNonvirtualIntMethod",
+      "signature": "jint CallNonvirtualIntMethod(JNIEnv*, jobject, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 80,
+      "name": "CallNonvirtualIntMethodV",
+      "signature": "jint CallNonvirtualIntMethodV(JNIEnv*, jobject, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 81,
+      "name": "CallNonvirtualIntMethodA",
+      "signature": "jint CallNonvirtualIntMethodA(JNIEnv*, jobject, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 82,
+      "name": "CallNonvirtualLongMethod",
+      "signature": "jlong CallNonvirtualLongMethod(JNIEnv*, jobject, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 83,
+      "name": "CallNonvirtualLongMethodV",
+      "signature": "jlong CallNonvirtualLongMethodV(JNIEnv*, jobject, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 84,
+      "name": "CallNonvirtualLongMethodA",
+      "signature": "jlong CallNonvirtualLongMethodA(JNIEnv*, jobject, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 85,
+      "name": "CallNonvirtualFloatMethod",
+      "signature": "jfloat CallNonvirtualFloatMethod(JNIEnv*, jobject, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 86,
+      "name": "CallNonvirtualFloatMethodV",
+      "signature": "jfloat CallNonvirtualFloatMethodV(JNIEnv*, jobject, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 87,
+      "name": "CallNonvirtualFloatMethodA",
+      "signature": "jfloat CallNonvirtualFloatMethodA(JNIEnv*, jobject, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 88,
+      "name": "CallNonvirtualDoubleMethod",
+      "signature": "jdouble CallNonvirtualDoubleMethod(JNIEnv*, jobject, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 89,
+      "name": "CallNonvirtualDoubleMethodV",
+      "signature": "jdouble CallNonvirtualDoubleMethodV(JNIEnv*, jobject, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 90,
+      "name": "CallNonvirtualDoubleMethodA",
+      "signature": "jdouble CallNonvirtualDoubleMethodA(JNIEnv*, jobject, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 91,
+      "name": "CallNonvirtualVoidMethod",
+      "signature": "void CallNonvirtualVoidMethod(JNIEnv*, jobject, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 92,
+      "name": "CallNonvirtualVoidMethodV",
+      "signature": "void CallNonvirtualVoidMethodV(JNIEnv*, jobject, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 93,
+      "name": "CallNonvirtualVoidMethodA",
+      "signature": "void CallNonvirtualVoidMethodA(JNIEnv*, jobject, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 94,
+      "name": "GetFieldID",
+      "signature": "jfieldID GetFieldID(JNIEnv*, jclass, const char*, const char*)"
+    },
+    {
+      "index": 95,
+      "name": "GetObjectField",
+      "signature": "jobject GetObjectField(JNIEnv*, jobject, jfieldID)"
+    },
+    {
+      "index": 96,
+      "name": "GetBooleanField",
+      "signature": "jboolean GetBooleanField(JNIEnv*, jobject, jfieldID)"
+    },
+    {
+      "index": 97,
+      "name": "GetByteField",
+      "signature": "jbyte GetByteField(JNIEnv*, jobject, jfieldID)"
+    },
+    {
+      "index": 98,
+      "name": "GetCharField",
+      "signature": "jchar GetCharField(JNIEnv*, jobject, jfieldID)"
+    },
+    {
+      "index": 99,
+      "name": "GetShortField",
+      "signature": "jshort GetShortField(JNIEnv*, jobject, jfieldID)"
+    },
+    {
+      "index": 100,
+      "name": "GetIntField",
+      "signature": "jint GetIntField(JNIEnv*, jobject, jfieldID)"
+    },
+    {
+      "index": 101,
+      "name": "GetLongField",
+      "signature": "jlong GetLongField(JNIEnv*, jobject, jfieldID)"
+    },
+    {
+      "index": 102,
+      "name": "GetFloatField",
+      "signature": "jfloat GetFloatField(JNIEnv*, jobject, jfieldID)"
+    },
+    {
+      "index": 103,
+      "name": "GetDoubleField",
+      "signature": "jdouble GetDoubleField(JNIEnv*, jobject, jfieldID)"
+    },
+    {
+      "index": 104,
+      "name": "SetObjectField",
+      "signature": "void SetObjectField(JNIEnv*, jobject, jfieldID, jobject)"
+    },
+    {
+      "index": 105,
+      "name": "SetBooleanField",
+      "signature": "void SetBooleanField(JNIEnv*, jobject, jfieldID, jboolean)"
+    },
+    {
+      "index": 106,
+      "name": "SetByteField",
+      "signature": "void SetByteField(JNIEnv*, jobject, jfieldID, jbyte)"
+    },
+    {
+      "index": 107,
+      "name": "SetCharField",
+      "signature": "void SetCharField(JNIEnv*, jobject, jfieldID, jchar)"
+    },
+    {
+      "index": 108,
+      "name": "SetShortField",
+      "signature": "void SetShortField(JNIEnv*, jobject, jfieldID, jshort)"
+    },
+    {
+      "index": 109,
+      "name": "SetIntField",
+      "signature": "void SetIntField(JNIEnv*, jobject, jfieldID, jint)"
+    },
+    {
+      "index": 110,
+      "name": "SetLongField",
+      "signature": "void SetLongField(JNIEnv*, jobject, jfieldID, jlong)"
+    },
+    {
+      "index": 111,
+      "name": "SetFloatField",
+      "signature": "void SetFloatField(JNIEnv*, jobject, jfieldID, jfloat)"
+    },
+    {
+      "index": 112,
+      "name": "SetDoubleField",
+      "signature": "void SetDoubleField(JNIEnv*, jobject, jfieldID, jdouble)"
+    },
+    {
+      "index": 113,
+      "name": "GetStaticMethodID",
+      "signature": "jmethodID GetStaticMethodID(JNIEnv*, jclass, const char*, const char*)"
+    },
+    {
+      "index": 114,
+      "name": "CallStaticObjectMethod",
+      "signature": "jobject CallStaticObjectMethod(JNIEnv*, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 115,
+      "name": "CallStaticObjectMethodV",
+      "signature": "jobject CallStaticObjectMethodV(JNIEnv*, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 116,
+      "name": "CallStaticObjectMethodA",
+      "signature": "jobject CallStaticObjectMethodA(JNIEnv*, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 117,
+      "name": "CallStaticBooleanMethod",
+      "signature": "jboolean CallStaticBooleanMethod(JNIEnv*, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 118,
+      "name": "CallStaticBooleanMethodV",
+      "signature": "jboolean CallStaticBooleanMethodV(JNIEnv*, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 119,
+      "name": "CallStaticBooleanMethodA",
+      "signature": "jboolean CallStaticBooleanMethodA(JNIEnv*, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 120,
+      "name": "CallStaticByteMethod",
+      "signature": "jbyte CallStaticByteMethod(JNIEnv*, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 121,
+      "name": "CallStaticByteMethodV",
+      "signature": "jbyte CallStaticByteMethodV(JNIEnv*, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 122,
+      "name": "CallStaticByteMethodA",
+      "signature": "jbyte CallStaticByteMethodA(JNIEnv*, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 123,
+      "name": "CallStaticCharMethod",
+      "signature": "jchar CallStaticCharMethod(JNIEnv*, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 124,
+      "name": "CallStaticCharMethodV",
+      "signature": "jchar CallStaticCharMethodV(JNIEnv*, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 125,
+      "name": "CallStaticCharMethodA",
+      "signature": "jchar CallStaticCharMethodA(JNIEnv*, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 126,
+      "name": "CallStaticShortMethod",
+      "signature": "jshort CallStaticShortMethod(JNIEnv*, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 127,
+      "name": "CallStaticShortMethodV",
+      "signature": "jshort CallStaticShortMethodV(JNIEnv*, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 128,
+      "name": "CallStaticShortMethodA",
+      "signature": "jshort CallStaticShortMethodA(JNIEnv*, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 129,
+      "name": "CallStaticIntMethod",
+      "signature": "jint CallStaticIntMethod(JNIEnv*, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 130,
+      "name": "CallStaticIntMethodV",
+      "signature": "jint CallStaticIntMethodV(JNIEnv*, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 131,
+      "name": "CallStaticIntMethodA",
+      "signature": "jint CallStaticIntMethodA(JNIEnv*, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 132,
+      "name": "CallStaticLongMethod",
+      "signature": "jlong CallStaticLongMethod(JNIEnv*, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 133,
+      "name": "CallStaticLongMethodV",
+      "signature": "jlong CallStaticLongMethodV(JNIEnv*, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 134,
+      "name": "CallStaticLongMethodA",
+      "signature": "jlong CallStaticLongMethodA(JNIEnv*, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 135,
+      "name": "CallStaticFloatMethod",
+      "signature": "jfloat CallStaticFloatMethod(JNIEnv*, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 136,
+      "name": "CallStaticFloatMethodV",
+      "signature": "jfloat CallStaticFloatMethodV(JNIEnv*, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 137,
+      "name": "CallStaticFloatMethodA",
+      "signature": "jfloat CallStaticFloatMethodA(JNIEnv*, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 138,
+      "name": "CallStaticDoubleMethod",
+      "signature": "jdouble CallStaticDoubleMethod(JNIEnv*, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 139,
+      "name": "CallStaticDoubleMethodV",
+      "signature": "jdouble CallStaticDoubleMethodV(JNIEnv*, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 140,
+      "name": "CallStaticDoubleMethodA",
+      "signature": "jdouble CallStaticDoubleMethodA(JNIEnv*, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 141,
+      "name": "CallStaticVoidMethod",
+      "signature": "void CallStaticVoidMethod(JNIEnv*, jclass, jmethodID, ...)"
+    },
+    {
+      "index": 142,
+      "name": "CallStaticVoidMethodV",
+      "signature": "void CallStaticVoidMethodV(JNIEnv*, jclass, jmethodID, va_list)"
+    },
+    {
+      "index": 143,
+      "name": "CallStaticVoidMethodA",
+      "signature": "void CallStaticVoidMethodA(JNIEnv*, jclass, jmethodID, const jvalue*)"
+    },
+    {
+      "index": 144,
+      "name": "GetStaticFieldID",
+      "signature": "jfieldID GetStaticFieldID(JNIEnv*, jclass, const char*, const char*)"
+    },
+    {
+      "index": 145,
+      "name": "GetStaticObjectField",
+      "signature": "jobject GetStaticObjectField(JNIEnv*, jclass, jfieldID)"
+    },
+    {
+      "index": 146,
+      "name": "GetStaticBooleanField",
+      "signature": "jboolean GetStaticBooleanField(JNIEnv*, jclass, jfieldID)"
+    },
+    {
+      "index": 147,
+      "name": "GetStaticByteField",
+      "signature": "jbyte GetStaticByteField(JNIEnv*, jclass, jfieldID)"
+    },
+    {
+      "index": 148,
+      "name": "GetStaticCharField",
+      "signature": "jchar GetStaticCharField(JNIEnv*, jclass, jfieldID)"
+    },
+    {
+      "index": 149,
+      "name": "GetStaticShortField",
+      "signature": "jshort GetStaticShortField(JNIEnv*, jclass, jfieldID)"
+    },
+    {
+      "index": 150,
+      "name": "GetStaticIntField",
+      "signature": "jint GetStaticIntField(JNIEnv*, jclass, jfieldID)"
+    },
+    {
+      "index": 151,
+      "name": "GetStaticLongField",
+      "signature": "jlong GetStaticLongField(JNIEnv*, jclass, jfieldID)"
+    },
+    {
+      "index": 152,
+      "name": "GetStaticFloatField",
+      "signature": "jfloat GetStaticFloatField(JNIEnv*, jclass, jfieldID)"
+    },
+    {
+      "index": 153,
+      "name": "GetStaticDoubleField",
+      "signature": "jdouble GetStaticDoubleField(JNIEnv*, jclass, jfieldID)"
+    },
+    {
+      "index": 154,
+      "name": "SetStaticObjectField",
+      "signature": "void SetStaticObjectField(JNIEnv*, jclass, jfieldID, jobject)"
+    },
+    {
+      "index": 155,
+      "name": "SetStaticBooleanField",
+      "signature": "void SetStaticBooleanField(JNIEnv*, jclass, jfieldID, jboolean)"
+    },
+    {
+      "index": 156,
+      "name": "SetStaticByteField",
+      "signature": "void SetStaticByteField(JNIEnv*, jclass, jfieldID, jbyte)"
+    },
+    {
+      "index": 157,
+      "name": "SetStaticCharField",
+      "signature": "void SetStaticCharField(JNIEnv*, jclass, jfieldID, jchar)"
+    },
+    {
+      "index": 158,
+      "name": "SetStaticShortField",
+      "signature": "void SetStaticShortField(JNIEnv*, jclass, jfieldID, jshort)"
+    },
+    {
+      "index": 159,
+      "name": "SetStaticIntField",
+      "signature": "void SetStaticIntField(JNIEnv*, jclass, jfieldID, jint)"
+    },
+    {
+      "index": 160,
+      "name": "SetStaticLongField",
+      "signature": "void SetStaticLongField(JNIEnv*, jclass, jfieldID, jlong)"
+    },
+    {
+      "index": 161,
+      "name": "SetStaticFloatField",
+      "signature": "void SetStaticFloatField(JNIEnv*, jclass, jfieldID, jfloat)"
+    },
+    {
+      "index": 162,
+      "name": "SetStaticDoubleField",
+      "signature": "void SetStaticDoubleField(JNIEnv*, jclass, jfieldID, jdouble)"
+    },
+    {
+      "index": 163,
+      "name": "NewString",
+      "signature": "jstring NewString(JNIEnv*, const jchar*, jsize)"
+    },
+    {
+      "index": 164,
+      "name": "GetStringLength",
+      "signature": "jsize GetStringLength(JNIEnv*, jstring)"
+    },
+    {
+      "index": 165,
+      "name": "GetStringChars",
+      "signature": "const jchar* GetStringChars(JNIEnv*, jstring, jboolean*)"
+    },
+    {
+      "index": 166,
+      "name": "ReleaseStringChars",
+      "signature": "void ReleaseStringChars(JNIEnv*, jstring, const jchar*)"
+    },
+    {
+      "index": 167,
+      "name": "NewStringUTF",
+      "signature": "jstring NewStringUTF(JNIEnv*, const char*)"
+    },
+    {
+      "index": 168,
+      "name": "GetStringUTFLength",
+      "signature": "jsize GetStringUTFLength(JNIEnv*, jstring)"
+    },
+    {
+      "index": 169,
+      "name": "GetStringUTFChars",
+      "signature": "const char* GetStringUTFChars(JNIEnv*, jstring, jboolean*)"
+    },
+    {
+      "index": 170,
+      "name": "ReleaseStringUTFChars",
+      "signature": "void ReleaseStringUTFChars(JNIEnv*, jstring, const char*)"
+    },
+    {
+      "index": 171,
+      "name": "GetArrayLength",
+      "signature": "jsize GetArrayLength(JNIEnv*, jarray)"
+    },
+    {
+      "index": 172,
+      "name": "NewObjectArray",
+      "signature": "jobjectArray NewObjectArray(JNIEnv*, jsize, jclass, jobject)"
+    },
+    {
+      "index": 173,
+      "name": "GetObjectArrayElement",
+      "signature": "jobject GetObjectArrayElement(JNIEnv*, jobjectArray, jsize)"
+    },
+    {
+      "index": 174,
+      "name": "SetObjectArrayElement",
+      "signature": "void SetObjectArrayElement(JNIEnv*, jobjectArray, jsize, jobject)"
+    },
+    {
+      "index": 175,
+      "name": "NewBooleanArray",
+      "signature": "jbooleanArray NewBooleanArray(JNIEnv*, jsize)"
+    },
+    {
+      "index": 176,
+      "name": "NewByteArray",
+      "signature": "jbyteArray NewByteArray(JNIEnv*, jsize)"
+    },
+    {
+      "index": 177,
+      "name": "NewCharArray",
+      "signature": "jcharArray NewCharArray(JNIEnv*, jsize)"
+    },
+    {
+      "index": 178,
+      "name": "NewShortArray",
+      "signature": "jshortArray NewShortArray(JNIEnv*, jsize)"
+    },
+    {
+      "index": 179,
+      "name": "NewIntArray",
+      "signature": "jintArray NewIntArray(JNIEnv*, jsize)"
+    },
+    {
+      "index": 180,
+      "name": "NewLongArray",
+      "signature": "jlongArray NewLongArray(JNIEnv*, jsize)"
+    },
+    {
+      "index": 181,
+      "name": "NewFloatArray",
+      "signature": "jfloatArray NewFloatArray(JNIEnv*, jsize)"
+    },
+    {
+      "index": 182,
+      "name": "NewDoubleArray",
+      "signature": "jdoubleArray NewDoubleArray(JNIEnv*, jsize)"
+    },
+    {
+      "index": 183,
+      "name": "GetBooleanArrayElements",
+      "signature": "jboolean* GetBooleanArrayElements(JNIEnv*, jbooleanArray, jboolean*)"
+    },
+    {
+      "index": 184,
+      "name": "GetByteArrayElements",
+      "signature": "jbyte* GetByteArrayElements(JNIEnv*, jbyteArray, jboolean*)"
+    },
+    {
+      "index": 185,
+      "name": "GetCharArrayElements",
+      "signature": "jchar* GetCharArrayElements(JNIEnv*, jcharArray, jboolean*)"
+    },
+    {
+      "index": 186,
+      "name": "GetShortArrayElements",
+      "signature": "jshort* GetShortArrayElements(JNIEnv*, jshortArray, jboolean*)"
+    },
+    {
+      "index": 187,
+      "name": "GetIntArrayElements",
+      "signature": "jint* GetIntArrayElements(JNIEnv*, jintArray, jboolean*)"
+    },
+    {
+      "index": 188,
+      "name": "GetLongArrayElements",
+      "signature": "jlong* GetLongArrayElements(JNIEnv*, jlongArray, jboolean*)"
+    },
+    {
+      "index": 189,
+      "name": "GetFloatArrayElements",
+      "signature": "jfloat* GetFloatArrayElements(JNIEnv*, jfloatArray, jboolean*)"
+    },
+    {
+      "index": 190,
+      "name": "GetDoubleArrayElements",
+      "signature": "jdouble* GetDoubleArrayElements(JNIEnv*, jdoubleArray, jboolean*)"
+    },
+    {
+      "index": 191,
+      "name": "ReleaseBooleanArrayElements",
+      "signature": "void ReleaseBooleanArrayElements(JNIEnv*, jbooleanArray, jboolean*, jint)"
+    },
+    {
+      "index": 192,
+      "name": "ReleaseByteArrayElements",
+      "signature": "void ReleaseByteArrayElements(JNIEnv*, jbyteArray, jbyte*, jint)"
+    },
+    {
+      "index": 193,
+      "name": "ReleaseCharArrayElements",
+      "signature": "void ReleaseCharArrayElements(JNIEnv*, jcharArray, jchar*, jint)"
+    },
+    {
+      "index": 194,
+      "name": "ReleaseShortArrayElements",
+      "signature": "void ReleaseShortArrayElements(JNIEnv*, jshortArray, jshort*, jint)"
+    },
+    {
+      "index": 195,
+      "name": "ReleaseIntArrayElements",
+      "signature": "void ReleaseIntArrayElements(JNIEnv*, jintArray, jint*, jint)"
+    },
+    {
+      "index": 196,
+      "name": "ReleaseLongArrayElements",
+      "signature": "void ReleaseLongArrayElements(JNIEnv*, jlongArray, jlong*, jint)"
+    },
+    {
+      "index": 197,
+      "name": "ReleaseFloatArrayElements",
+      "signature": "void ReleaseFloatArrayElements(JNIEnv*, jfloatArray, jfloat*, jint)"
+    },
+    {
+      "index": 198,
+      "name": "ReleaseDoubleArrayElements",
+      "signature": "void ReleaseDoubleArrayElements(JNIEnv*, jdoubleArray, jdouble*, jint)"
+    },
+    {
+      "index": 199,
+      "name": "GetBooleanArrayRegion",
+      "signature": "void GetBooleanArrayRegion(JNIEnv*, jbooleanArray, jsize, jsize, jboolean*)"
+    },
+    {
+      "index": 200,
+      "name": "GetByteArrayRegion",
+      "signature": "void GetByteArrayRegion(JNIEnv*, jbyteArray, jsize, jsize, jbyte*)"
+    },
+    {
+      "index": 201,
+      "name": "GetCharArrayRegion",
+      "signature": "void GetCharArrayRegion(JNIEnv*, jcharArray, jsize, jsize, jchar*)"
+    },
+    {
+      "index": 202,
+      "name": "GetShortArrayRegion",
+      "signature": "void GetShortArrayRegion(JNIEnv*, jshortArray, jsize, jsize, jshort*)"
+    },
+    {
+      "index": 203,
+      "name": "GetIntArrayRegion",
+      "signature": "void GetIntArrayRegion(JNIEnv*, jintArray, jsize, jsize, jint*)"
+    },
+    {
+      "index": 204,
+      "name": "GetLongArrayRegion",
+      "signature": "void GetLongArrayRegion(JNIEnv*, jlongArray, jsize, jsize, jlong*)"
+    },
+    {
+      "index": 205,
+      "name": "GetFloatArrayRegion",
+      "signature": "void GetFloatArrayRegion(JNIEnv*, jfloatArray, jsize, jsize, jfloat*)"
+    },
+    {
+      "index": 206,
+      "name": "GetDoubleArrayRegion",
+      "signature": "void GetDoubleArrayRegion(JNIEnv*, jdoubleArray, jsize, jsize, jdouble*)"
+    },
+    {
+      "index": 207,
+      "name": "SetBooleanArrayRegion",
+      "signature": "void SetBooleanArrayRegion(JNIEnv*, jbooleanArray, jsize, jsize, const jboolean*)"
+    },
+    {
+      "index": 208,
+      "name": "SetByteArrayRegion",
+      "signature": "void SetByteArrayRegion(JNIEnv*, jbyteArray, jsize, jsize, const jbyte*)"
+    },
+    {
+      "index": 209,
+      "name": "SetCharArrayRegion",
+      "signature": "void SetCharArrayRegion(JNIEnv*, jcharArray, jsize, jsize, const jchar*)"
+    },
+    {
+      "index": 210,
+      "name": "SetShortArrayRegion",
+      "signature": "void SetShortArrayRegion(JNIEnv*, jshortArray, jsize, jsize, const jshort*)"
+    },
+    {
+      "index": 211,
+      "name": "SetIntArrayRegion",
+      "signature": "void SetIntArrayRegion(JNIEnv*, jintArray, jsize, jsize, const jint*)"
+    },
+    {
+      "index": 212,
+      "name": "SetLongArrayRegion",
+      "signature": "void SetLongArrayRegion(JNIEnv*, jlongArray, jsize, jsize, const jlong*)"
+    },
+    {
+      "index": 213,
+      "name": "SetFloatArrayRegion",
+      "signature": "void SetFloatArrayRegion(JNIEnv*, jfloatArray, jsize, jsize, const jfloat*)"
+    },
+    {
+      "index": 214,
+      "name": "SetDoubleArrayRegion",
+      "signature": "void SetDoubleArrayRegion(JNIEnv*, jdoubleArray, jsize, jsize, const jdouble*)"
+    },
+    {
+      "index": 215,
+      "name": "RegisterNatives",
+      "signature": "jint RegisterNatives(JNIEnv*, jclass, const JNINativeMethod*, jint)"
+    },
+    {
+      "index": 216,
+      "name": "UnregisterNatives",
+      "signature": "jint UnregisterNatives(JNIEnv*, jclass)"
+    },
+    {
+      "index": 217,
+      "name": "MonitorEnter",
+      "signature": "jint MonitorEnter(JNIEnv*, jobject)"
+    },
+    {
+      "index": 218,
+      "name": "MonitorExit",
+      "signature": "jint MonitorExit(JNIEnv*, jobject)"
+    },
+    {
+      "index": 219,
+      "name": "GetJavaVM",
+      "signature": "jint GetJavaVM(JNIEnv*, JavaVM**)"
+    },
+    {
+      "index": 220,
+      "name": "GetStringRegion",
+      "signature": "void GetStringRegion(JNIEnv*, jstring, jsize, jsize, jchar*)"
+    },
+    {
+      "index": 221,
+      "name": "GetStringUTFRegion",
+      "signature": "void GetStringUTFRegion(JNIEnv*, jstring, jsize, jsize, char*)"
+    },
+    {
+      "index": 222,
+      "name": "GetPrimitiveArrayCritical",
+      "signature": "void* GetPrimitiveArrayCritical(JNIEnv*, jarray, jboolean*)"
+    },
+    {
+      "index": 223,
+      "name": "ReleasePrimitiveArrayCritical",
+      "signature": "void ReleasePrimitiveArrayCritical(JNIEnv*, jarray, void*, jint)"
+    },
+    {
+      "index": 224,
+      "name": "GetStringCritical",
+      "signature": "const jchar* GetStringCritical(JNIEnv*, jstring, jboolean*)"
+    },
+    {
+      "index": 225,
+      "name": "ReleaseStringCritical",
+      "signature": "void ReleaseStringCritical(JNIEnv*, jstring, const jchar*)"
+    },
+    {
+      "index": 226,
+      "name": "NewWeakGlobalRef",
+      "signature": "jweak NewWeakGlobalRef(JNIEnv*, jobject)"
+    },
+    {
+      "index": 227,
+      "name": "DeleteWeakGlobalRef",
+      "signature": "void DeleteWeakGlobalRef(JNIEnv*, jweak)"
+    },
+    {
+      "index": 228,
+      "name": "ExceptionCheck",
+      "signature": "jboolean ExceptionCheck(JNIEnv*)"
+    },
+    {
+      "index": 229,
+      "name": "NewDirectByteBuffer",
+      "signature": "jobject NewDirectByteBuffer(JNIEnv*, void*, jlong)"
+    },
+    {
+      "index": 230,
+      "name": "GetDirectBufferAddress",
+      "signature": "void* GetDirectBufferAddress(JNIEnv*, jobject)"
+    },
+    {
+      "index": 231,
+      "name": "GetDirectBufferCapacity",
+      "signature": "jlong GetDirectBufferCapacity(JNIEnv*, jobject)"
+    },
+    {
+      "index": 232,
+      "name": "GetObjectRefType",
+      "signature": "jobjectRefType GetObjectRefType(JNIEnv*, jobject)"
+    }
+  ]
+}

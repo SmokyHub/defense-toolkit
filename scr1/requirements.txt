@@ -1,0 +1,5 @@
+# Tested together on Python 3.12; isolated from the lab's Frida environment.
+qiling==1.4.6
+pyelftools==0.33
+unicorn==2.1.4
+capstone==5.0.9

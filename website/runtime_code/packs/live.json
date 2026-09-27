@@ -1,0 +1,97 @@
+{
+  "format": "runtime-code.pack/v1",
+  "id": "lab.live",
+  "limits": {
+    "capture_bytes": 1048576,
+    "queue_depth": 512,
+    "pending_bytes": 16777216,
+    "events": 200000
+  },
+  "tokens": [
+    {
+      "name": "dex-inputs",
+      "capability": "dex.input.java",
+      "mode": "extract",
+      "trigger": "load",
+      "handlers": [
+        "structure"
+      ]
+    },
+    {
+      "name": "native-inventory",
+      "capability": "native.inventory",
+      "mode": "observe",
+      "trigger": "attach_and_module_change",
+      "selection": {
+        "exclude_prefixes": [
+          "/system/",
+          "/apex/",
+          "/vendor/"
+        ]
+      },
+      "handlers": []
+    },
+    {
+      "name": "webviews",
+      "capability": "webview.platform",
+      "mode": "observe",
+      "trigger": "call",
+      "handlers": []
+    },
+    {
+      "name": "java-network",
+      "capability": "network.platform",
+      "mode": "observe",
+      "trigger": "call",
+      "handlers": []
+    },
+    {
+      "name": "native-network",
+      "capability": "network.native",
+      "mode": "observe",
+      "trigger": "call",
+      "handlers": []
+    },
+    {
+      "name": "json-parser",
+      "capability": "parser.json",
+      "mode": "observe",
+      "trigger": "call",
+      "handlers": []
+    },
+    {
+      "name": "cipher",
+      "capability": "crypto.cipher",
+      "mode": "observe",
+      "trigger": "call",
+      "handlers": [],
+      "selection": {
+        "capture_keys": true
+      }
+    },
+    {
+      "name": "app-flow",
+      "capability": "flow.java",
+      "mode": "observe",
+      "trigger": "call",
+      "selection": {
+        "discover_from_stacks": true,
+        "max_methods": 96,
+        "object_depth": 4,
+        "object_fields": 24,
+        "object_nodes": 12,
+        "tracked_objects": 512,
+        "object_time_ms": 20
+      },
+      "handlers": []
+    },
+    {
+      "name": "navigation-reflection",
+      "capability": "reflection.java",
+      "mode": "observe",
+      "trigger": "call",
+      "selection": {},
+      "handlers": []
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+set -euo pipefail
+WEBSITE_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+cd "$WEBSITE_ROOT"
+exec "${RUNTIME_CODE_PYTHON:-python3}" -m runtime_code "$@"

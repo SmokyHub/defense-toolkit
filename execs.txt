@@ -1,0 +1,14 @@
+elf_plaintext_reconstructor.py \
+    lib.so \
+    --static-only \
+    --require-signals \
+    --.so-results
+
+
+python3 scripts/analyze_dex_response.py \
+    app.zip \
+    --out work/app-results \
+    --print-template
+
+
+scripts/runtime-code watch --device xxx --app lab.runtimecode.flow --pack ~/Downloads/runtime-flow-scope.json

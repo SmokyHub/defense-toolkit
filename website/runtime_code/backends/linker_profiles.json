@@ -1,0 +1,13 @@
+{
+  "format": "runtime-code.internal-profiles/v1",
+  "profiles": [{
+    "id": "lab-api34-x64-linker-c5f2d0e1",
+    "api": "34", "abi": "x86_64", "module": "linker64",
+    "sha256": "c5f2d0e1e2c6104d3c30a6169bee9363f16ad1a658ab1bc375e93bbcc6842bd3",
+    "reader": "__dl__ZN9ElfReader4ReadEPKcill",
+    "reader_prefix": "55415741565350b001803f00",
+    "fd_argument": 2, "offset_argument": 3, "size_argument": 4,
+    "stat_size": 144, "stat_mode_offset": 24, "stat_file_size_offset": 48,
+    "evidence": "Installed linker Read at 0x5f8d0: EDX fd -> this+0x20; RCX offset -> +0x28; R8 size -> +0x30. ReadElfHeader 0x5f960 forwards these to pread before segment load or constructors. Linux x86_64 stat layout is separately verified by the NDK fixture compile."
+  }]
+}

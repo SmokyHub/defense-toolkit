@@ -1,0 +1,10 @@
+{
+  "format": "runtime-code.pack/v1",
+  "id": "lab.art-inputs-and-states",
+  "limits": {"capture_bytes": 4194304, "capture_ms": 100, "tracked_regions": 32, "snapshot_interval_ms": 1000, "queue_depth": 128},
+  "tokens": [
+    {"name": "art-inputs", "capability": "dex.input.art", "mode": "extract", "trigger": "load",
+     "selection": {"exclude_prefixes": ["/system/", "/apex/"]}, "handlers": ["structure"]},
+    {"name": "runtime-dex-states", "capability": "dex.snapshot.runtime", "mode": "snapshot", "trigger": "poll", "handlers": ["structure"]}
+  ]
+}

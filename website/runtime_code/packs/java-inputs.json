@@ -1,0 +1,10 @@
+{
+  "format": "runtime-code.pack/v1",
+  "id": "lab.public-java-inputs",
+  "limits": {"capture_bytes": 4194304, "capture_ms": 100},
+  "tokens": [
+    {"name": "caller-dex-buffers", "capability": "dex.input.java", "mode": "extract", "trigger": "load", "handlers": ["structure"]},
+    {"name": "native-modules", "capability": "native.inventory", "mode": "observe", "trigger": "attach_and_module_change",
+     "selection": {"exclude_prefixes": ["/system/", "/apex/", "/vendor/"]}, "handlers": []}
+  ]
+}

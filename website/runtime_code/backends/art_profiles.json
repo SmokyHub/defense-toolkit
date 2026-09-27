@@ -1,0 +1,20 @@
+{
+  "format": "runtime-code.internal-profiles/v1",
+  "profiles": [
+    {
+      "id": "lab-api34-x64-dexfile-6142813e",
+      "api": "34",
+      "abi": "x86_64",
+      "module": "libdexfile.so",
+      "path": "/apex/com.android.art/lib64/libdexfile.so",
+      "sha256": "6142813ed70f382dcc55403d224a9889e66a0e549f23c748ffb8058a53d79dc4",
+      "constructor": "_ZN3art7DexFileC2EPKhmRKNSt3__112basic_stringIcNS3_11char_traitsIcEENS3_9allocatorIcEEEEjPKNS_10OatDexFileENS3_10shared_ptrINS_16DexFileContainerEEEb",
+      "destructor": "_ZN3art7DexFileD2Ev",
+      "constructor_prefix": "554157415641554154534883ec18",
+      "begin_offset": 8,
+      "size_offset": 16,
+      "size_argument": 2,
+      "evidence": "Installed binary disassembly: constructor 0x1cb80; 0x1cbba stores RSI at this+8, 0x1cbbe stores RDX at this+16; destructor 0x1d180. This profile never applies to another hash."
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+# Optional worker dependency for automatic Dalvik consumer analysis.
+androguard==4.1.4

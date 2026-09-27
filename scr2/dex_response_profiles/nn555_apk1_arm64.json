@@ -1,0 +1,348 @@
+{
+  "format": "apk-defense.loader-profile/v1",
+  "id": "nn555_apk1_arm64",
+  "artifact_path": "lib/arm64-v8a/libapp.so",
+  "original_sha256": "22bb61550f29070a05972f3785f4046c68f7ca440938ea36ea71d015e54112e1",
+  "evidence": {
+    "static": "reports/flutter_20260926_apk1/01_code_audit.md",
+    "historical_dynamic": "reports/flutter_20260926_comparison/HTTPTOOLKIT_VALIDATION.md",
+    "claim": "Response map -> byte conversion -> direct ByteBuffer -> response-controlled JNI loader chain"
+  },
+  "segments": [
+    {
+      "offset": 0,
+      "va": 0,
+      "filesz": 1115890,
+      "memsz": 1115890,
+      "flags": 4,
+      "align": 65536,
+      "sha256": "4429cb53bbd78b48031a32b1e58f77df60bcca87c78972e204668055b9380674"
+    },
+    {
+      "offset": 1179648,
+      "va": 1179648,
+      "filesz": 3389248,
+      "memsz": 3389248,
+      "flags": 5,
+      "align": 65536,
+      "sha256": "92936e01a6bb4f866efed12809a477c846f8bb59861e2eaef478a523c853e1e9"
+    },
+    {
+      "offset": 4587520,
+      "va": 4587520,
+      "filesz": 112,
+      "memsz": 112,
+      "flags": 6,
+      "align": 65536,
+      "sha256": "a02bdfe432a817101204de064c548c5ee020c748c6a790a15e95a1b64987ae45"
+    }
+  ],
+  "key_sites": {
+    "key_00": {
+      "va": 4466656
+    },
+    "key_01": {
+      "va": 4469400
+    },
+    "key_02": {
+      "va": 4469772
+    },
+    "key_03": {
+      "va": 4469996
+    },
+    "key_04": {
+      "va": 4470128
+    },
+    "key_05": {
+      "va": 4470476
+    },
+    "key_06": {
+      "va": 4470612
+    },
+    "key_07": {
+      "va": 4470728
+    },
+    "key_08": {
+      "va": 4471152
+    },
+    "key_09": {
+      "va": 4471268
+    },
+    "key_10": {
+      "va": 4471620
+    },
+    "key_11": {
+      "va": 4471736
+    },
+    "key_12": {
+      "va": 4471888
+    },
+    "key_13": {
+      "va": 4472180
+    },
+    "key_14": {
+      "va": 4472384
+    },
+    "key_15": {
+      "va": 4472500
+    }
+  },
+  "equal_keys": [
+    [
+      "key_00",
+      "key_01",
+      "key_02",
+      "key_03",
+      "key_04"
+    ]
+  ],
+  "elf_normalization": "runtime_notes_v1",
+  "dependencies": [
+    {
+      "path": "lib/arm64-v8a/libdartjni.so",
+      "sha256": "524626c9f23766f70c853bb6be74f4c0c64e624f7fe5f32883c84f1abb8e92bf",
+      "runtime_segments": [
+        {
+          "offset": 0,
+          "va": 0,
+          "filesz": 125968,
+          "memsz": 125968,
+          "flags": 5,
+          "align": 16384,
+          "sha256": "a212111a0a0cffd80b40207e6b66ab9b21a9d0e82ee13e7f6971ed03552a7cb1"
+        },
+        {
+          "offset": 125968,
+          "va": 142352,
+          "filesz": 1376,
+          "memsz": 5104,
+          "flags": 6,
+          "align": 16384,
+          "sha256": "83a4a81836df66702341989bce874b4081c40acbd6e87d210829addba0d23612"
+        },
+        {
+          "offset": 127344,
+          "va": 160112,
+          "filesz": 1784,
+          "memsz": 2424,
+          "flags": 6,
+          "align": 16384,
+          "sha256": "4c7923626067db35875c2a906fbf633df40667f9aa0335ed8e9f44d0f25b5386"
+        }
+      ]
+    }
+  ],
+  "bindings": [
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_05"
+        }
+      ],
+      "role": "loader_class",
+      "value": "dalvik/system/InMemoryDexClassLoader",
+      "evidence": {
+        "report": "reports/flutter_20260926_apk1/01_code_audit.md",
+        "key_va": "0x4436cc",
+        "consumer": "Java class name"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_06"
+        }
+      ],
+      "role": "dex_bytes",
+      "value": "DEX ARRAY",
+      "evidence": {
+        "report": "reports/flutter_20260926_apk1/01_code_audit.md",
+        "key_va": "0x443754",
+        "consumer": "payload list to integer bytes to direct ByteBuffer"
+      },
+      "provenance": "placeholder"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_07"
+        }
+      ],
+      "role": "loader_constructor",
+      "value": "(Ljava/nio/ByteBuffer;Ljava/lang/ClassLoader;)V",
+      "evidence": {
+        "report": "reports/flutter_20260926_apk1/01_code_audit.md",
+        "key_va": "0x4437c8",
+        "consumer": "first class constructor descriptor"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_08"
+        }
+      ],
+      "role": "parent_method",
+      "value": "getClassLoader",
+      "evidence": {
+        "report": "reports/flutter_20260926_apk1/01_code_audit.md",
+        "key_va": "0x443970",
+        "consumer": "Activity method name; zero arguments; object return"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_09"
+        }
+      ],
+      "role": "parent_descriptor",
+      "value": "()Ljava/lang/ClassLoader;",
+      "evidence": {
+        "report": "reports/flutter_20260926_apk1/01_code_audit.md",
+        "key_va": "0x4439e4",
+        "consumer": "Activity method descriptor"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_10"
+        }
+      ],
+      "role": "load_class_method",
+      "value": "loadClass",
+      "evidence": {
+        "report": "reports/flutter_20260926_apk1/01_code_audit.md",
+        "key_va": "0x443b44",
+        "consumer": "first constructed object method name; one Java String argument"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_11"
+        }
+      ],
+      "role": "load_class_descriptor",
+      "value": "(Ljava/lang/String;)Ljava/lang/Class;",
+      "evidence": {
+        "report": "reports/flutter_20260926_apk1/01_code_audit.md",
+        "key_va": "0x443bb8",
+        "consumer": "descriptor paired with 268"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_12"
+        }
+      ],
+      "role": "payload_class",
+      "value": {
+        "contract": "payload_class"
+      },
+      "evidence": {
+        "report": "reports/flutter_20260926_apk1/01_code_audit.md",
+        "key_va": "0x443c50",
+        "consumer": "argument to method 268; likely target class"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_13"
+        }
+      ],
+      "role": "payload_constructor",
+      "value": "()V",
+      "evidence": {
+        "report": "reports/flutter_20260926_apk1/01_code_audit.md",
+        "key_va": "0x443d74",
+        "consumer": "returned class zero-argument constructor descriptor"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_14"
+        }
+      ],
+      "role": "entry_method",
+      "value": {
+        "contract": "entry_method"
+      },
+      "evidence": {
+        "report": "reports/flutter_20260926_apk1/01_code_audit.md",
+        "key_va": "0x443e40",
+        "consumer": "final entry method name; Activity argument; void adapter"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_15"
+        }
+      ],
+      "role": "entry_descriptor",
+      "value": {
+        "contract": "entry_descriptor"
+      },
+      "evidence": {
+        "report": "reports/flutter_20260926_apk1/01_code_audit.md",
+        "key_va": "0x443eb4",
+        "consumer": "descriptor paired with 33"
+      },
+      "provenance": "compatible_benign_test_contract"
+    }
+  ],
+  "fixed_calls": [],
+  "request": {
+    "method": "POST",
+    "url": "https://zyvenza.chrono-sync-api.com/installation",
+    "provenance": "historical_wire_capture_for_matching_loaded_code"
+  },
+  "coverage": "Same loaded ARM64 code/data and bridge; allows reviewed MOVZ numeric-key rotations, GNU build IDs and section-table metadata changes. New AOT instruction layouts require review."
+}

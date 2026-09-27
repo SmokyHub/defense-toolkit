@@ -1,0 +1,130 @@
+{
+  "format": "runtime-code.pack/v1",
+  "id": "lab.obfuscated-flow-fixture",
+  "limits": {
+    "capture_bytes": 1048576,
+    "queue_depth": 512,
+    "pending_bytes": 16777216,
+    "events": 200000
+  },
+  "tokens": [
+    {
+      "name": "dex-inputs",
+      "capability": "dex.input.java",
+      "mode": "extract",
+      "trigger": "load",
+      "handlers": [
+        "structure"
+      ]
+    },
+    {
+      "name": "native-inventory",
+      "capability": "native.inventory",
+      "mode": "observe",
+      "trigger": "attach_and_module_change",
+      "selection": {
+        "exclude_prefixes": [
+          "/system/",
+          "/apex/",
+          "/vendor/"
+        ]
+      },
+      "handlers": []
+    },
+    {
+      "name": "webviews",
+      "capability": "webview.platform",
+      "mode": "observe",
+      "trigger": "call",
+      "handlers": []
+    },
+    {
+      "name": "java-network",
+      "capability": "network.platform",
+      "mode": "observe",
+      "trigger": "call",
+      "handlers": []
+    },
+    {
+      "name": "native-network",
+      "capability": "network.native",
+      "mode": "observe",
+      "trigger": "call",
+      "handlers": []
+    },
+    {
+      "name": "json-parser",
+      "capability": "parser.json",
+      "mode": "observe",
+      "trigger": "call",
+      "handlers": []
+    },
+    {
+      "name": "cipher",
+      "capability": "crypto.cipher",
+      "mode": "observe",
+      "trigger": "call",
+      "handlers": [],
+      "selection": {
+        "capture_keys": true
+      }
+    },
+    {
+      "name": "app-flow",
+      "capability": "flow.java",
+      "mode": "observe",
+      "trigger": "call",
+      "selection": {
+        "discover_from_stacks": false,
+        "max_methods": 128,
+        "object_depth": 4,
+        "object_fields": 24,
+        "object_nodes": 12,
+        "tracked_objects": 512,
+        "object_time_ms": 20,
+        "classes": [
+          "v80",
+          "a90",
+          "p50",
+          "rv",
+          "wk",
+          "al",
+          "zk",
+          "yk",
+          "xk",
+          "qh",
+          "yb0$a",
+          "lab.runtimecode.flow.EntryActivity",
+          "lab.runtimecode.flow.RelayActivity",
+          "lab.runtimecode.flow.BrowserActivity",
+          "z8"
+        ],
+        "apk_sha256": "523dca0240ce2faa6cf416fa2655a6a9502d255614a44fcaad6d6a26a44813db"
+      },
+      "handlers": []
+    },
+    {
+      "name": "navigation-reflection",
+      "capability": "reflection.java",
+      "mode": "observe",
+      "trigger": "call",
+      "selection": {},
+      "handlers": []
+    },
+    {
+      "name": "custom-parser",
+      "capability": "parser.custom",
+      "mode": "observe",
+      "trigger": "call",
+      "selection": {
+        "methods": [
+          {
+            "class": "qb0",
+            "method": "a"
+          }
+        ]
+      },
+      "handlers": []
+    }
+  ]
+}

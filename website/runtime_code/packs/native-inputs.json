@@ -1,0 +1,10 @@
+{
+ "format": "runtime-code.pack/v1", "id": "lab.linker-inputs",
+ "limits": {"capture_bytes": 4194304, "capture_ms": 100},
+ "tokens": [
+   {"name": "linker-inputs", "capability": "native.input.linker", "mode": "extract", "trigger": "load",
+    "selection": {"exclude_prefixes": ["/system/", "/apex/", "/vendor/"]}, "handlers": ["structure"]},
+   {"name": "native-modules", "capability": "native.inventory", "mode": "observe", "trigger": "attach_and_module_change", "handlers": [],
+    "selection": {"exclude_prefixes": ["/system/", "/apex/", "/vendor/"]}}
+ ]
+}

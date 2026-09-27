@@ -1,0 +1,59 @@
+{
+  "format": "runtime-code.pack/v1",
+  "id": "lab.reflected-navigation",
+  "limits": {
+    "capture_bytes": 1048576,
+    "queue_depth": 512,
+    "pending_bytes": 16777216
+  },
+  "tokens": [
+    {
+      "name": "web",
+      "capability": "webview.platform",
+      "mode": "observe",
+      "trigger": "call",
+      "handlers": []
+    },
+    {
+      "name": "reflection",
+      "capability": "reflection.java",
+      "mode": "observe",
+      "trigger": "call",
+      "handlers": []
+    },
+    {
+      "name": "decoder",
+      "capability": "crypto.custom",
+      "mode": "observe",
+      "trigger": "call",
+      "selection": {
+        "methods": [
+          {
+            "class": "a",
+            "method": "x"
+          }
+        ]
+      },
+      "handlers": []
+    },
+    {
+      "name": "app",
+      "capability": "flow.java",
+      "mode": "observe",
+      "trigger": "call",
+      "selection": {
+        "methods": [
+          {
+            "class": "a",
+            "method": "live"
+          },
+          {
+            "class": "a",
+            "method": "client"
+          }
+        ]
+      },
+      "handlers": []
+    }
+  ]
+}
