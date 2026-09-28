@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Offline APK/ZIP DEX-response analyzer. Python 3.10+; semantic worker uses Androguard.
 
-Audited AOT profiles and bounded Dalvik consumer analysis recover response bindings.
+Automatic offline Dalvik consumer analysis and bounded Flutter discovery.
+Reviewed AOT profiles are optional and must be explicitly selected on the CLI.
 Unresolved flows remain inconclusive. No sample code, device, backend or external
 service is used. See docs/dex-response-analyzer.md.
 """
@@ -11,7 +12,9 @@ import argparse
 import hashlib
 import io
 import json
+import os
 import re
+import signal
 import stat
 import struct
 import sys
@@ -552,6 +555,65 @@ def semantic_discovery(artifacts, options):
             return {'findings': [], 'diagnostics': ['semantic_worker_unavailable_or_failed: ' + str(error)]}
 
 
+def flutter_discovery(artifacts, options):
+    if options.get('disabled') or options.get('no_flutter'):
+        return {'findings': [], 'diagnostics': ['flutter_analysis_disabled']}
+    apps = [a for a in artifacts if a['path'] == 'lib/arm64-v8a/libapp.so']
+    if not apps:
+        return {'findings': [], 'diagnostics': ['no_arm64_flutter_image']}
+    python = options.get('python')
+    if not python:
+        local = Path(__file__).resolve().parents[1] / '.venvs/analysis/bin/python'
+        if not local.is_file():
+            local = Path.home() / 'tools/venv/bin/python'
+        python = str(local) if local.is_file() else sys.executable
+    worker = Path(__file__).resolve().with_name('flutter_semantic.py')
+    bridge = next((a for a in artifacts if a['path'] == 'lib/arm64-v8a/libdartjni.so'), None)
+    with tempfile.TemporaryDirectory(prefix='flutter-semantic-') as temp:
+        libapp = Path(temp) / 'libapp.so'
+        libapp.write_bytes(apps[0]['data'])
+        command = [python, str(worker), str(libapp)]
+        for key, flag in [('blutter_dir', '--blutter-dir'), ('blutter_bin', '--blutter-bin')]:
+            if options.get(key):
+                command.extend([flag, str(options[key])])
+        if bridge:
+            path = Path(temp) / 'libdartjni.so'
+            path.write_bytes(bridge['data'])
+            command.extend(['--bridge', str(path)])
+        try:
+            # File-backed stdout prevents an unbounded host-memory allocation.
+            with (Path(temp) / 'result.json').open('w+b') as output, (Path(temp) / 'stderr').open('w+b') as errors:
+                process = subprocess.Popen(command, stdout=output, stderr=errors,
+                                           start_new_session=(os.name == 'posix'))
+                try:
+                    process.wait(timeout=options.get('flutter_timeout', 180))
+                except subprocess.TimeoutExpired:
+                    if os.name == 'posix':
+                        try:
+                            os.killpg(process.pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                    else:
+                        process.kill()
+                    process.wait()
+                    raise
+                output.seek(0); raw = output.read(16 * 1024**2 + 1)
+                if len(raw) > 16 * 1024**2:
+                    raise AnalysisError('Flutter worker result exceeds size limit')
+                if process.returncode:
+                    errors.seek(0)
+                    raise AnalysisError('Flutter worker failed: ' + errors.read(2048).decode(errors='replace'))
+                result = json_load(raw)
+                if not isinstance(result, dict) or not isinstance(result.get('findings'), list):
+                    raise AnalysisError('Invalid Flutter-worker result')
+                result['artifact'] = {'path': apps[0]['path'], 'sha256': apps[0]['sha256']}
+                if bridge:
+                    result['bridge_artifact'] = {'path': bridge['path'], 'sha256': bridge['sha256']}
+                return result
+        except (OSError, subprocess.TimeoutExpired, ValueError) as error:
+            return {'findings': [], 'diagnostics': ['flutter_worker_unavailable_or_failed: ' + str(error)]}
+
+
 def analyze_app(apks, profiles, contract, semantic_options=None):
     package = apks[0]['identity']['package']
     versions = {(a['identity'].get('versionCode'), a['identity'].get('versionCodeMajor', '0')) for a in apks}
@@ -588,7 +650,9 @@ def analyze_app(apks, profiles, contract, semantic_options=None):
                                 'request': profile.get('request'), 'rendered': rendered})
         inventory.append(facts)
     semantic = {'findings': [], 'diagnostics': []}
+    flutter = {'findings': [], 'diagnostics': ['explicit_profile_matched_flutter_discovery_skipped']}
     if not matches:
+        flutter = flutter_discovery(list(unique), semantic_options or {})
         semantic = semantic_discovery(list(unique), {**(semantic_options or {}), 'contract': contract})
         for index, finding in enumerate(semantic['findings']):
             discovered = {'bindings': finding['bindings'], 'fixed_calls': finding['fixed_calls'],
@@ -602,6 +666,18 @@ def analyze_app(apks, profiles, contract, semantic_options=None):
                             'artifacts': [{'path': a['path'], 'sha256': a['sha256']} for a in unique if a['kind'] == 'DEX'],
                             'extracted_keys': {}, 'evidence': finding['evidence'], 'request': None,
                             'resolved_contract': finding['contract'], 'rendered': rendered})
+        for index, finding in enumerate(flutter['findings']):
+            try:
+                rendered = render(finding, {}, contract)
+            except AnalysisError as error:
+                flutter['diagnostics'].append('schema_constraint_failure: ' + str(error))
+                continue
+            matches.append({'profile_id': f'flutter_dataflow_{index + 1}',
+                            'profile_source': 'automatic_flutter_consumer_inference',
+                            'artifacts': [{'path': a['path'], 'sha256': a['sha256']} for a in unique
+                                          if a['path'].endswith(('/libapp.so', '/libdartjni.so'))],
+                            'extracted_keys': {}, 'evidence': finding['evidence'], 'request': None,
+                            'resolved_contract': contract, 'rendered': rendered})
     complete_input = '' in identities
     multiple_verified_paths = bool(matches) and all(m['profile_source'] == 'automatic_consumer_dataflow' for m in matches)
     complete = complete_input and (len(matches) == 1 or multiple_verified_paths)
@@ -612,11 +688,12 @@ def analyze_app(apks, profiles, contract, semantic_options=None):
             if artifact['path'].endswith('/libapp.so'):
                 facts['numeric_string_candidates'] = candidate_sites(artifact['data'])
     signals_present = any(item['signals'].get('dex_loader_api') for item in inventory)
-    reason = ('network_to_loader_consumer_dataflow' if complete and multiple_verified_paths else
+    reason = ('conditional_flutter_consumer_contract' if complete and any(m['profile_source'] == 'automatic_flutter_consumer_inference' for m in matches) else
+              'network_to_loader_consumer_dataflow' if complete and multiple_verified_paths else
               'reviewed_loaded_code_and_dependencies_match' if complete else
               'base_apk_missing' if not complete_input else
               'ambiguous_multiple_loader_profiles' if len(matches) > 1 else
-              'no_complete_reviewed_loader_match')
+              'automatic_discovery_incomplete')
     return {
         'package': package, 'version': dict(zip(('versionCode', 'versionCodeMajor'), next(iter(versions)))),
         'apks': [{'origin': a['origin'], 'identity': a['identity']} for a in apks],
@@ -626,6 +703,7 @@ def analyze_app(apks, profiles, contract, semantic_options=None):
         'automation': {'template_ready': complete, 'action': 'validate_template' if complete else 'manual_review'},
         'inventory': inventory, 'matches': matches if complete else [],
         'semantic_analysis': {key: value for key, value in semantic.items() if key != 'findings'},
+        'flutter_analysis': {key: value for key, value in flutter.items() if key != 'findings'},
         'limitations': [
             'Offline static analysis; no sample, DEX, device or backend was executed/contacted.',
             'Filled method/class values implement the selected benign test contract, not recovered production server values.',
@@ -636,8 +714,8 @@ def analyze_app(apks, profiles, contract, semantic_options=None):
     }
 
 
-def load_profiles(extra):
-    locations = [(path, 'builtin') for path in sorted((Path(__file__).resolve().parent / 'dex_response_profiles').glob('*.json'))]
+def load_profiles(extra, include_builtin=False):
+    locations = [(path, 'builtin') for path in sorted((Path(__file__).resolve().parent / 'dex_response_profiles').glob('*.json'))] if include_builtin else []
     locations += [(Path(path), 'custom_local_review_required') for path in extra]
     profiles, ids = [], set()
     for path, source in locations:
@@ -672,7 +750,7 @@ def run(input_path, out_dir, profiles, contract, limits, semantic_options=None):
         raise AnalysisError('No APKs found')
     apps = [analyze_app(groups[key], profiles, contract, semantic_options) for key in sorted(groups)]
     result = {'format': FORMAT, 'input_sha256': digest, 'input_name': input_path.name,
-              'analysis_mode': 'offline_profiles_and_bounded_consumer_dataflow',
+              'analysis_mode': 'offline_explicit_profiles_and_discovery' if profiles else 'offline_automatic_discovery',
               'contract': contract, 'placeholder': PLACEHOLDER,
               'status': 'complete' if all(a['automation']['template_ready'] for a in apps) else 'needs_review',
               'apps': apps}
@@ -704,8 +782,12 @@ def main(argv=None):
     parser.add_argument('--print-template', action='store_true',
                         help='Print only the filled response JSON for one complete app; diagnostics go to stderr')
     parser.add_argument('--profile', action='append', default=[], help='Additional locally reviewed JSON loader profile')
-    parser.add_argument('--no-semantic', action='store_true', help='Disable automatic Dalvik consumer analysis')
-    parser.add_argument('--semantic-python', help='Python interpreter with Androguard installed (lab venv is auto-detected)')
+    parser.add_argument('--reviewed-profiles', action='store_true', help='Opt in to bundled reviewed Flutter profiles (legacy path)')
+    parser.add_argument('--no-semantic', action='store_true', help='Disable all automatic code analysis')
+    parser.add_argument('--no-flutter', action='store_true', help='Disable automatic Flutter discovery only')
+    parser.add_argument('--blutter-dir', help='Installed Blutter directory; default BLUTTER_HOME or ~/tools/blutter')
+    parser.add_argument('--blutter-bin', help='Installed snapshot-compatible native Blutter analyzer; never a download wrapper')
+    parser.add_argument('--semantic-python', help='Python with Androguard, Capstone and pyelftools (lab venv is auto-detected)')
     parser.add_argument('--payload-class', default=DEFAULT_CONTRACT['payload_class'])
     parser.add_argument('--entry-method', default=DEFAULT_CONTRACT['entry_method'])
     parser.add_argument('--max-total-mib', type=int, default=1024)
@@ -719,9 +801,10 @@ def main(argv=None):
         integer(args.max_total_mib, 'total size limit', 1, 16384)
         integer(args.max_member_mib, 'member size limit', 1, 2048)
         contract = {**DEFAULT_CONTRACT, 'payload_class': args.payload_class, 'entry_method': args.entry_method}
-        result = run(args.input, args.out, load_profiles(args.profile), contract,
+        result = run(args.input, args.out, load_profiles(args.profile, include_builtin=args.reviewed_profiles), contract,
                      {'max_bytes': args.max_total_mib * 1024**2, 'max_member': args.max_member_mib * 1024**2},
-                     {'disabled': args.no_semantic, 'python': args.semantic_python})
+                     {'disabled': args.no_semantic, 'python': args.semantic_python, 'no_flutter': args.no_flutter,
+                      'blutter_dir': args.blutter_dir, 'blutter_bin': args.blutter_bin})
         outputs = [{'package': application['package'], 'profile_id': match['profile_id'],
                     **{name: str(args.out / path) for name, path in match['files'].items()}}
                    for application in result['apps'] for match in application['matches']]

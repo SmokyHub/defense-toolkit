@@ -11,28 +11,38 @@ import threading
 import time
 
 from ..model import Capability
+from ..config import get_config, config_source
 from . import register
 
 
 def host_compatibility(version):
-    if version not in ('17.18.0','17.19.0'):
-        raise RuntimeError('Supported Frida host versions: 17.18.0, 17.19.0; use an exactly matching server')
+    known=version in ('17.5.2','17.18.0','17.19.0')
+    opted_in=get_config()['frida']['allow_untested_version'] and re.fullmatch(r'17\.\d+\.\d+',version)
+    if not known and not opted_in:
+        raise RuntimeError('Supported Frida host versions: 17.5.2, 17.18.0, 17.19.0; use an exactly matching server. Other 17.x versions require frida.allow_untested_version=true and have no established coverage')
     return {'host_version':version,'required_server_version':version,
             'server_flavor':'unverified',
-            'validation':'host_api_only' if version=='17.18.0' else 'see_device_validation_matrix',
+            'validation':('host_api_only' if version in ('17.5.2','17.18.0') else 'see_device_validation_matrix') if known else 'untested_explicit_opt_in',
             'limitations':['Host version does not establish server flavor or device/build coverage',
                             'Florida 17.18.0 has not been validated with the capture fixtures']}
 
 
-def adb(serial,*args):
-    result=subprocess.run(['adb','-s',serial,*args],capture_output=True,text=True,timeout=15,check=True)
+def adb(serial,*args,timeout=None,stage=None):
+    seconds=timeout if timeout is not None else get_config()['timeouts']['adb']
+    command=[get_config()['paths']['adb'],*(['-s',serial] if serial else []),*args]
+    try:
+        result=subprocess.run(command,capture_output=True,text=True,timeout=seconds,check=True)
+    except subprocess.TimeoutExpired as error:
+        operation=stage or 'ADB '+' '.join(args[:5])
+        raise TimeoutError(f'{operation} on {serial or "host"} timed out after {seconds}s; inspect the emulator/app logs and adjust the corresponding timeouts setting in runtime-code.local.json') from error
     return result.stdout.strip()
 
 
 @contextmanager
-def frida_deadline(stage,seconds=10):
+def frida_deadline(stage,seconds=None):
     """Cancel transport waits and identify the stalled startup operation."""
     import frida
+    seconds=get_config()['timeouts']['connect'] if seconds is None else seconds
     with frida.Cancellable() as cancel:
         expired=threading.Event()
         def expire():
@@ -42,7 +52,7 @@ def frida_deadline(stage,seconds=10):
             yield
         except Exception as error:
             if expired.is_set():
-                raise TimeoutError(f'{stage} exceeded {seconds}s; check the Frida server and foreground app on the selected device') from error
+                raise TimeoutError(f'{stage} exceeded {seconds}s; check the Frida version/server and foreground app on the selected device; timeouts are configurable in runtime-code.local.json') from error
             raise
         finally:timer.cancel()
 
@@ -53,28 +63,24 @@ def launch_app(serial,app):
     component=adb(serial,'shell','cmd','package','resolve-activity','--brief',app).splitlines()
     if not component or not re.fullmatch(r'[A-Za-z0-9_.$]+/[A-Za-z0-9_.$]+',component[-1]):
         raise ValueError('No launchable Activity for '+app)
-    launch=adb(serial,'shell','am','start','-W','-n',component[-1])
+    # Do not wait for the first Activity draw: slow splash/network initialization
+    # must not prevent attachment to an otherwise runnable process.
+    launch=adb(serial,'shell','am','start','-n',component[-1],timeout=get_config()['timeouts']['launch'],stage='Launching Android Activity')
     if 'Error:' in launch or 'Status: timeout' in launch:raise ValueError('Activity launch failed: '+launch)
-    deadline=time.monotonic()+5
+    deadline=time.monotonic()+get_config()['timeouts']['process']
     while time.monotonic()<deadline:
-        result=subprocess.run(['adb','-s',serial,'shell','pidof',app],capture_output=True,text=True,timeout=2)
-        if result.returncode==0 and len(result.stdout.split())==1 and result.stdout.strip().isdigit():return int(result.stdout.strip())
+        try:
+            result=adb(serial,'shell','pidof',app,timeout=min(get_config()['timeouts']['adb'],max(.1,deadline-time.monotonic())),stage='Waiting for app process')
+            if len(result.split())==1 and result.isdigit():return int(result)
+        except subprocess.CalledProcessError:pass
         time.sleep(.1)
-    raise RuntimeError('Android launched no stable app process; inspect launch/crash logs')
+    raise RuntimeError(f"Android launched no stable app process within {get_config()['timeouts']['process']}s on {serial}; inspect launch/crash logs (timeouts.process)")
 
 
 def preflight(serial,require_root=True):
-    allowed={'33011FDH20018E':'Pixel 7','emulator-5554':'sdk_gphone64','127.0.0.1:6520':'Cuttlefish'}
-    if re.fullmatch(r'emulator-\d+',serial):
-        name=adb(serial,'emu','avd','name').splitlines()[0]
-        if name not in ('anzol_lab_api34_x86_64','anzol_lab_api36_x86_64'):
-            raise ValueError('Emulator AVD is not a designated lab image')
-        allowed[serial]='sdk_gphone64'
-    if serial not in allowed:
-        raise ValueError('Device is not in the designated lab device policy')
+    if not serial or not re.fullmatch(r'[A-Za-z0-9_.:\-]+',serial):
+        raise ValueError('Select an explicit Android device serial')
     model=adb(serial,'shell','getprop','ro.product.model')
-    if allowed[serial] not in model:
-        raise ValueError('Device model does not match the designated serial')
     result={'serial':serial,'model':model}
     for name,prop in [('fingerprint','ro.build.fingerprint'),('api','ro.build.version.sdk'),('abi','ro.product.cpu.abi')]:
         result[name]=adb(serial,'shell','getprop',prop)
@@ -110,7 +116,7 @@ class FridaBackend:
         port=os.environ.get('RUNTIME_CODE_FRIDA_SERVER_PORT')
         if port is not None and (not port.isascii() or not port.isdigit() or not 1<=int(port)<=65535):
             raise ValueError('RUNTIME_CODE_FRIDA_SERVER_PORT must be a device TCP port from 1 to 65535')
-        self.server_port=int(port) if port is not None else None
+        self.server_port=int(port) if port is not None else get_config()['frida']['server_port'] if config_source() else None
         self.forward_port=None
         self.remote_endpoint=None
         self.companions=[]
@@ -131,7 +137,7 @@ class FridaBackend:
         item['companion_stats']=[]
         for index,spec in enumerate(self.companions):
             metadata={k:v for k,v in spec.items() if k!='source'}
-            with frida_deadline('Loading companion '+spec['name'],15):
+            with frida_deadline('Loading companion '+spec['name'],get_config()['timeouts']['script_load']):
                 # Each create_script has separate globals and RPC exports. Do not
                 # concatenate analyst source with the collector or rewrite it.
                 script=session.create_script(self.java_bridge_source(isolated=True)+'\n'+spec['source'],name='companion-'+str(index)+'-'+spec['name'])
@@ -172,7 +178,7 @@ class FridaBackend:
 
     def connect_device(self,serial):
         import frida
-        if self.server_port is None:return frida.get_device(serial,timeout=5)
+        if self.server_port is None:return frida.get_device(serial,timeout=get_config()['timeouts']['connect'])
         # Allocate an owned host port through the already verified device serial.
         # Never connect an arbitrary endpoint while attributing it to another device.
         forwarded=adb(serial,'forward','tcp:0',f'tcp:{self.server_port}')
@@ -183,44 +189,48 @@ class FridaBackend:
         return frida.get_device_manager().add_remote_device(self.remote_endpoint)
 
     def available_devices(self):
-        result=subprocess.run(['adb','devices'],capture_output=True,text=True,timeout=10,check=True)
-        return [line.split()[0] for line in result.stdout.splitlines()[1:] if len(line.split())==2 and line.split()[1]=='device'
-                and (line.split()[0] in ('33011FDH20018E','127.0.0.1:6520') or re.fullmatch(r'emulator-\d+',line.split()[0]))]
+        result=adb(None,'devices',stage='Listing connected Android devices')
+        return [line.split()[0] for line in result.splitlines()[1:] if len(line.split())>=2 and line.split()[1]=='device']
 
     def prepare_watch(self,serial,app):
-        """One explicit lab workflow: verified stock server, Android launch, late attach."""
+        """Prepare the matching server, launch Android Activity, then attach."""
         import frida
-        if frida.__version__!='17.18.0':
-            raise RuntimeError('The live workflow is pinned to Frida 17.18.0. Run scripts/runtime-code instead.')
+        settings=get_config();version=settings['frida']['version']
+        if frida.__version__!=version:
+            raise RuntimeError(f"Configured Frida {version} but this Python has {frida.__version__}; install the matching host package or edit frida.version in runtime-code.local.json")
+        host_compatibility(version)
         if not re.fullmatch(r'[A-Za-z0-9_.]+',app):raise ValueError('Invalid package identifier')
         info=preflight(serial,require_root=False)
         if not info['root'] and serial.startswith('emulator-'):
             adb(serial,'root')
-            subprocess.run(['adb','-s',serial,'wait-for-device'],timeout=10,check=True,capture_output=True)
+            adb(serial,'wait-for-device',stage='Waiting for root adbd restart')
             info=preflight(serial)
-        if not info['root']:raise ValueError('Root adbd is required on the selected lab device')
+        if not info['root']:raise ValueError('Root adbd is required on the selected Android device')
         abi={'arm64-v8a':'arm64','x86_64':'x86_64'}.get(info['abi'])
         if not abi:raise ValueError('Live server binary unavailable for '+info['abi'])
         bundled=Path(__file__).resolve().parents[2]/'vendor/frida-server'
-        server_dir=Path(os.environ['RUNTIME_CODE_SERVER_DIR']) if os.environ.get('RUNTIME_CODE_SERVER_DIR') else bundled if bundled.is_dir() else Path.home()/'tools/frida-server'
-        local=server_dir/f'frida-server-17.18.0-android-{abi}'
+        server_dir=Path(os.environ['RUNTIME_CODE_SERVER_DIR']).expanduser() if os.environ.get('RUNTIME_CODE_SERVER_DIR') else bundled if bundled.is_dir() and not config_source() else Path(settings['paths']['server_dir']).expanduser()
+        local=server_dir/f'frida-server-{version}-android-{abi}'
         if not local.is_file():raise ValueError('Missing verified matching server binary: '+str(local))
-        self.server_port=27043
-        remote='/data/local/tmp/runtime-code-fsd-17.18.0'
+        self.server_port=self.server_port or settings['frida']['server_port']
+        remote=f'/data/local/tmp/runtime-code-fsd-{version}'
         expected=hashlib.sha256(local.read_bytes()).hexdigest()
         try:actual=adb(serial,'shell','sha256sum',remote).split()[0]
         except subprocess.CalledProcessError:actual=None
         if actual!=expected:
             adb(serial,'push',str(local),remote);adb(serial,'shell','chmod','755',remote)
+        actual_version=adb(serial,'shell',remote,'--version')
+        if actual_version!=version:
+            raise RuntimeError(f'Frida server reports {actual_version!r}, expected {version}; check paths.server_dir before launch')
         # Reuse a matching live endpoint; report conflicts rather than kill another server.
-        probe_port=adb(serial,'forward','tcp:0','tcp:27043')
+        probe_port=adb(serial,'forward','tcp:0',f'tcp:{self.server_port}')
         endpoint='127.0.0.1:'+probe_port;manager=frida.get_device_manager()
-        ready=False
+        ready=False;probe_error=None
         try:
-            with frida_deadline('Probing Frida server',3):
+            with frida_deadline('Probing Frida server',settings['timeouts']['connect']):
                 device=manager.add_remote_device(endpoint)
                 device.query_system_parameters();ready=True
-        except Exception:ready=False
+        except Exception as error:probe_error=str(error)
         finally:
             try:
                 with frida_deadline('Closing Frida probe',2):manager.remove_remote_device(endpoint)
@@ -228,14 +238,19 @@ class FridaBackend:
             adb(serial,'forward','--remove','tcp:'+probe_port)
         if not ready:
             listeners=adb(serial,'shell','ss','-lntp')
-            if re.search(r':27043\s',listeners):
-                raise RuntimeError('Device port 27043 is occupied but does not answer as the expected Frida server; existing listener was left untouched')
-            adb(serial,'shell',f'nohup {remote} -D -l 127.0.0.1:27043 >{remote}.log 2>&1 </dev/null &')
-            time.sleep(.3)
-        listeners=adb(serial,'shell','ss','-lntp')
-        owners=[int(pid) for line in listeners.splitlines() if re.search(r':27043\s',line) for pid in re.findall(r'pid=(\d+)',line)]
+            if re.search(rf':{self.server_port}\s',listeners):
+                raise RuntimeError(f'Device port {self.server_port} is occupied but does not answer as the expected Frida server; existing listener was left untouched. Probe: {probe_error}')
+            adb(serial,'shell',f'nohup {remote} -D -l 127.0.0.1:{self.server_port} >{remote}.log 2>&1 </dev/null &')
+        deadline=time.monotonic()+settings['timeouts']['server_start']
+        while True:
+            remaining=deadline-time.monotonic()
+            if remaining<=0:raise TimeoutError(f'Frida server did not listen on {serial}:{self.server_port} within {settings["timeouts"]["server_start"]}s; inspect {remote}.log')
+            listeners=adb(serial,'shell','ss','-lntp',timeout=min(settings['timeouts']['adb'],remaining),stage='Waiting for Frida server listener')
+            if re.search(rf':{self.server_port}\s',listeners):break
+            time.sleep(min(.2,max(0,deadline-time.monotonic())))
+        owners=[int(pid) for line in listeners.splitlines() if re.search(rf':{self.server_port}\s',line) for pid in re.findall(r'pid=(\d+)',line)]
         if len(set(owners))!=1 or adb(serial,'shell','sha256sum',f'/proc/{owners[0]}/exe').split()[0]!=expected:
-            raise RuntimeError('Cannot verify that device port 27043 belongs to the matching 17.18.0 server binary')
+            raise RuntimeError(f'Cannot verify that device port {self.server_port} belongs to the matching {version} server binary')
         # Launching through Android avoids unsupported zygote spawn profiles and is
         # explicitly recorded as late attachment by start().
         return launch_app(serial,app)
@@ -315,6 +330,8 @@ class FridaBackend:
     def start(self,service,pack,app,serial,pid=None):
         import frida
         compatibility=host_compatibility(frida.__version__)
+        if config_source() and frida.__version__!=get_config()['frida']['version']:
+            raise RuntimeError('Frida host version differs from configured frida.version')
         if not re.fullmatch(r'[A-Za-z0-9_.]+',app):
             raise ValueError('Invalid package identifier')
         self.service,self.pack,self.app=service,pack,app
@@ -352,6 +369,7 @@ class FridaBackend:
             system=self.device.query_system_parameters()
         if system.get('access')=='jailed':
             raise RuntimeError('Full Frida server access unavailable. Start the matching rooted frida-server; APK/Gadget modification is not used.')
+        device_info['host_configuration']={'source':config_source(),'timeouts':dict(get_config()['timeouts']),'configured_frida':dict(get_config()['frida'])}
         device_info['frida']=frida.__version__
         device_info['frida_compatibility']=compatibility
         device_info['frida_transport']={'kind':'adb_forward' if self.server_port else 'device_default',
@@ -381,7 +399,7 @@ class FridaBackend:
                 raise ValueError('Process UID does not match requested app; isolated/shared-process ownership needs separate support')
             process=self.service.process(pid,name,{'mode':mode,'startup_events_may_be_missed':True,
                 'app_uid':self.uid,'scope':'explicitly negotiated tokens','process_identity':'host UUID per attachment'})
-            with frida_deadline(f'Attaching to {name} (PID {pid})'):
+            with frida_deadline(f'Attaching to {name} (PID {pid})',get_config()['timeouts']['attach']):
                 session=self.device.attach(pid)
             self.sessions[process]={'pid':pid,'session':session,'script':None}
             with frida_deadline('Creating instrumentation script'):
@@ -397,7 +415,7 @@ class FridaBackend:
                     item=self.sessions.pop(process,None)
                     if item:self.report_companions(item,process)
             session.on('detached',detached)
-            with frida_deadline('Loading instrumentation script',15):script.load()
+            with frida_deadline('Loading instrumentation script',get_config()['timeouts']['script_load']):script.load()
             self.load_companions(session,self.sessions[process],process)
 
     def poll(self):
@@ -430,7 +448,7 @@ class FridaBackend:
             size=int(adb(self.serial,'shell','stat','-c','%s',shlex.quote(path)));total+=size
             if size<0 or total>128*1024**2:raise ValueError('Installed APK copy exceeds 128 MiB static budget; use selected DEX files')
             target=Path(directory)/(str(index)+'.apk')
-            subprocess.run(['adb','-s',self.serial,'pull',path,str(target)],capture_output=True,text=True,check=True,timeout=30)
+            adb(self.serial,'pull',path,str(target),timeout=get_config()['timeouts']['pull'],stage='Copying installed APK')
             if target.stat().st_size!=size:raise ValueError('APK changed size during copy')
             yield target,{'source_kind':'installed_apk_copy','device':self.serial,'package':self.app,'device_path':path}
 

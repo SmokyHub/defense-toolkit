@@ -1,6 +1,7 @@
 # Live workflow
 
-Use one launcher and the pinned stock Frida 17.18.0 environment:
+Use one launcher. The default remains the tested stock Frida 17.18.0 environment;
+[per-PC configuration](runtime-code-configuration.md) selects paths, devices, versions and timeouts:
 
 ```bash
 cd ~/Documents/apk_defense
@@ -9,8 +10,9 @@ scripts/runtime-code watch --app PACKAGE.NAME
 scripts/runtime-code watch --device emulator-5554 --app PACKAGE.NAME
 ```
 
-The launcher uses `~/tools/venv-frida-17.18.0`. The adapter verifies the designated device,
-root access and package ownership, prepares the matching stock server on device loopback
+The launcher prefers `.venvs/runtime/bin/python`, falling back to `~/tools/venv-frida-17.18.0`.
+`RUNTIME_CODE_PYTHON` overrides it. By default, the adapter checks the selected Android device
+for root access and package ownership, prepares the matching stock server on device loopback
 port 27043, and attaches to the app. Android launches or foregrounds the launcher Activity
 first, including when a cached process already exists. Startup stages are printed immediately;
 Frida connection, attachment and script installation have bounded waits with stage-specific errors.

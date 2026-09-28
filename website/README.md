@@ -13,6 +13,15 @@ a complete macOS-to-Android live capture has not been validated in this lab.
 ADB must be installed separately and available on `PATH`. Supply an **Android** Frida server
 matching the phone's ABI, even when the host is an Apple Silicon Mac.
 
+## Configure each PC
+
+Run `./runtime-code config init` to create `runtime-code.local.json`, then edit ADB/server
+paths, the default device, Frida version/port and timeouts there.
+Any connected Android device can be selected; no designated image or device allowlist is required.
+`./runtime-code config show` displays the effective settings.
+See [configuration examples and troubleshooting](docs/runtime-code-configuration.md), including
+a Mac emulator example. Use `--config /path/mac.json` to select a different settings file.
+
 ## Browse saved evidence
 
 Copy the entire saved store directory from the original PC after stopping its collector/server
@@ -34,13 +43,19 @@ its matching capture pack. `test-apk/SHA256SUMS` lets you verify both files. The
 exercises dynamic DEX input, a loopback server, parsing, AES decoding, Activity/Fragment
 hops, WebView interception and the JS bridge, then attempts navigation to Google.
 
-Use your own authorized rooted device/emulator, ADB and matching Frida installation. The
-documented lab device policy is retained; the Pixel serial below is the authorized lab Pixel.
-`watch` expects the stock 17.18.0 Android server file in `~/tools/frida-server/`, or in a directory
+Use your own authorized rooted device/emulator, ADB and matching Frida installation.
+The example below selects an Android emulator.
+`watch` defaults to the stock 17.18.0 Android server file in `~/tools/frida-server/`, or in a directory
 selected with `RUNTIME_CODE_SERVER_DIR`. Required filenames are
 `frida-server-17.18.0-android-arm64` or `frida-server-17.18.0-android-x86_64`.
+Set `frida.version` and `paths.server_dir` to use another matching host/server installation.
 These server files must be supplied separately. The live host requirements are declared in
 `requirements-live-optional.txt` if you need to prepare your own Python environment.
+For **Frida 17.5.2**, install `requirements-live-frida-17.5.2.txt` instead, set
+`frida.version` to `17.5.2` in `runtime-code.local.json`, and supply
+`frida-server-17.5.2-android-arm64` for your ARM64 Android emulator. This uses compatible
+`frida-tools==14.5.0` and needs no untested-version override. See the Mac configuration
+example linked above.
 
 ```bash
 # On the destination PC, install dependencies separately if needed:
@@ -52,8 +67,8 @@ export RUNTIME_CODE_PYTHON="$PWD/.venvs/runtime/bin/python"
 python3.12 -m venv .venvs/analysis
 .venvs/analysis/bin/python -m pip install -r requirements-analysis.txt
 
-adb -s 33011FDH20018E install -r test-apk/runtime-flow.apk
-./runtime-code watch --device 33011FDH20018E --app lab.runtimecode.flow \
+adb -s emulator-5554 install -r test-apk/runtime-flow.apk
+./runtime-code watch --device emulator-5554 --app lab.runtimecode.flow \
   --pack test-apk/live-pack.json
 ```
 
@@ -62,7 +77,7 @@ alongside the built-in capture agent, pass its filename with `--script` (absolut
 avoid ambiguity; relative paths are resolved from this website directory):
 
 ```bash
-./runtime-code watch --device 33011FDH20018E --app lab.runtimecode.flow \
+./runtime-code watch --device emulator-5554 --app lab.runtimecode.flow \
   --pack test-apk/live-pack.json --script /absolute/path/my-script.js
 ```
 

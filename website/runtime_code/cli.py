@@ -10,15 +10,18 @@ from .model import Pack, negotiate
 from .analysis import HANDLERS,discover_handlers
 from .service import Service
 from .store import Store
+from .config import load_config, config_source, write_example
 
 
 def main():
     parser=argparse.ArgumentParser(prog='python -m runtime_code')
-    parser.add_argument('--store',default='work/runtime-code',help='Managed SQLite/artifact directory')
+    parser.add_argument('--config',help='Machine-local JSON settings file')
+    parser.add_argument('--store',help='Managed SQLite/artifact directory')
     sub=parser.add_subparsers(dest='command',required=True)
+    c=sub.add_parser('config',help='Create or inspect machine-local settings');c.add_argument('action',choices=('init','show'));c.add_argument('--out',default='runtime-code.local.json')
     c=sub.add_parser('capabilities');c.add_argument('--backend',required=True)
     c=sub.add_parser('capture');c.add_argument('--backend',required=True);c.add_argument('--pack',required=True)
-    c.add_argument('--app',required=True);c.add_argument('--device',required=True);c.add_argument('--pid',type=int)
+    c.add_argument('--app',required=True);c.add_argument('--device');c.add_argument('--pid',type=int)
     c.add_argument('--seconds',type=float,default=30);c.add_argument('--ui-port',type=int)
     c.add_argument('--script',action='append',default=[],help='Additional script file, in an isolated backend context; repeat for multiple files')
     c=sub.add_parser('watch',help='Live capture, portal and JSONL log until Ctrl+C')
@@ -57,9 +60,20 @@ def main():
     c=sub.add_parser('recover');c.add_argument('--run',required=True)
     c=sub.add_parser('snapshot');c.add_argument('--run',required=True);c.add_argument('--process',required=True);c.add_argument('--target',required=True)
     c=sub.add_parser('command');c.add_argument('id')
+    for command_parser in sub.choices.values():
+        command_parser.add_argument('--config',default=argparse.SUPPRESS,help='Machine-local JSON settings file')
     args=parser.parse_args()
     store=None
     try:
+        if args.command=='config' and args.action=='init':
+            write_example(args.out);print(json.dumps({'created':args.out}));return
+        settings=load_config(args.config)
+        if args.command=='config':
+            print(json.dumps({'source':config_source(),'settings':settings},indent=2));return
+        args.store=args.store or settings['paths']['store']
+        if args.command in ('capture','watch'):
+            args.device=args.device or settings['device']['serial'] or None
+            if args.command=='capture' and not args.device:raise ValueError('Select --device or configure device.serial')
         registry=discover()
         discover_handlers()
         if args.command=='capabilities':
@@ -81,7 +95,7 @@ def main():
                 if not hasattr(backend,'prepare_watch'):raise ValueError('Selected backend does not implement live launch preparation')
                 devices=backend.available_devices()
                 if not args.device:
-                    if len(devices)!=1:raise ValueError('Select --device; available authorized devices: '+', '.join(devices))
+                    if len(devices)!=1:raise ValueError('Select --device; available Android devices: '+', '.join(devices))
                     args.device=devices[0]
                 service.reserve(args.app,args.device)
                 args.pid=backend.prepare_watch(args.device,args.app)

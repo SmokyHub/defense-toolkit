@@ -8,6 +8,9 @@ It is an initial vertical slice of the requested platform, **not completion of t
 The terminal, keyboard TUI and local browser workspace share the same services and SQLite store.
 Captured code is evidence of an observed state, not evidence of maliciousness or complete recovery.
 
+For per-PC ADB/server paths, emulator identities, Frida versions and startup timeouts,
+see [machine-local configuration](runtime-code-configuration.md).
+
 ## Run it
 
 ### macOS host setup
@@ -65,8 +68,8 @@ Use the lab interpreter for live capture (Frida 17.19.0 and its matching `frida-
 
 The app must already be installed. The collector does not patch, sign, install Gadget, enable app
 debugging, change SELinux, root a device, or silently switch from spawn to attach. `--pid` explicitly
-selects late attachment. A matching, rooted Frida server must already be running. Only designated
-lab serials are accepted, and model, root access, package UID and process UID are checked.
+selects late attachment. A matching, rooted Frida server must already be running. Any selected Android device is accepted; root access, package UID and process UID are
+checked. Device model/build information is recorded without an image or serial allowlist.
 
 The browser URL printed by `--ui-port` contains a local authorization token in its fragment.
 The server binds to `127.0.0.1`; requests require that token. Treat the URL as sensitive.

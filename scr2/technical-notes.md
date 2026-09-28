@@ -1,11 +1,14 @@
 # Offline DEX response analyzer
 
-Run from any working directory with Python 3.10 or newer. Keep `scripts/dex_response_profiles/`
-and `scripts/dex_semantic.py` beside the main script when copying it. Reviewed-profile matching
-uses the standard library; automatic Dalvik analysis requires Androguard 4.1.4. The lab's
+Run from any working directory with Python 3.10 or newer. Keep `scripts/dex_semantic.py`,
+`scripts/flutter_semantic.py` and `scripts/flutter_contract.py` beside the main script when copying it. **Profiles are not
+loaded by default.** Automatic Dalvik analysis requires Androguard 4.1.4; Flutter discovery
+requires Capstone 5.0.7, pyelftools 0.33 and an installed snapshot-compatible native Blutter
+analyzer. The lab's
 `~/tools/venv/bin/python` is selected automatically. Elsewhere, install
 `scripts/requirements-dex-response.txt` in a virtual environment and select its interpreter with
-`--semantic-python /path/to/venv/bin/python`. `--no-semantic` disables this discovery pass.
+`--semantic-python /path/to/venv/bin/python`. `--no-semantic` disables both discovery passes;
+`--no-flutter` disables only Flutter discovery.
 
 ```bash
 python3 /home/nyx/Documents/apk_defense/scripts/analyze_dex_response.py \
@@ -30,10 +33,14 @@ are analyzed separately; conflicting versions/splits are rejected. A directory c
 analysis files is not an input. The tool reads manifests and executable members without installing,
 running, uploading, or contacting the app/backend.
 
-**There are two analysis paths: guarded matching of the reviewed NN555 Flutter ARM64 layouts,
-and bounded automatic discovery of Dalvik/Java/Kotlin response consumers.** The latter derives
+**The default uses automatic discovery, with different coverage for Dalvik and Flutter.**
+The Dalvik/Java/Kotlin consumer analyzer derives
 new JSON keys, packed method fields and app-owned entry names from bytecode without a matching
-profile. It does not independently recover these variations from pure Flutter AOT or native code.
+profile. Flutter analysis now emits the filled loader contracts for APK1–APK3 without
+application profiles. It derives key paths and roles from receiver/argument relationships,
+lazy-initializer metadata, concrete dispatch targets and JNI bridge relocations. These are
+**conditional static test contracts**, with branch and library-semantic assumptions retained
+in their evidence; they are not proofs of network delivery or runtime execution.
 Unknown or unsupported loaders get candidate evidence and
 `needs_review`, not a guessed complete schema or a claim that loading is absent. Encrypted values
 available only from an unseen server cannot be recovered from the APK.
@@ -46,11 +53,17 @@ available only from an unseen server cannot be recovered from the APK.
 - `capability.status`: `supported_by_static_evidence`, `possible`, or `unknown`.
 - `schema_status`: `complete_for_test_contract` or `needs_review`.
 - `automation.template_ready` and `automation.action` (`validate_template` or `manual_review`).
-- Matched profile, recovered keys, field roles, addresses/evidence, selected values and their provenance.
+- Recovered keys, field roles, addresses/evidence, selected values and their provenance where established.
+- `flutter_analysis`: snapshot/analyzer identities, input hashes, candidate access/call addresses,
+  request context, unresolved JNI receivers, bounded-slice diagnostics and explicit limitations.
 - Automatic matches carry `profile_source: automatic_consumer_dataflow`, DEX hashes, instruction
   evidence, `fixed_calls`, `resolved_contract`, and `dex_encodings`. `semantic_analysis` records
   instruction counts and diagnostics for unsupported paths. Those counts are not a coverage score.
-- The historical endpoint/method for the matched code, clearly labeled as historical evidence.
+- Flutter matches use `profile_source: automatic_flutter_consumer_inference` and
+  `capability.reason: conditional_flutter_consumer_contract`. Their evidence includes the
+  object/void adapters, byte conversion, JSON parser context, table-provider identity, and
+  success-path conditions. `profile_id` is a legacy output-field name, not a loaded profile.
+- Explicit legacy profiles additionally provide the reviewed historical endpoint/method.
 - Unresolved cases: candidate loader/network strings and bounded ARM64 numeric-string construction
   hints. These are not a recovered source-to-sink path. Generic SDK/JNI hits never establish loading.
 
@@ -88,7 +101,7 @@ use `dalvik/system/InMemoryDexClassLoader`, its ByteBuffer/ClassLoader construct
 `loadClass`, and their compatible JNI descriptors. These are the values used in the benign validation,
 not claims about server-only literals recovered statically.
 
-For the original APK1, the generated template is:
+For the original APK1, the automatic mode generates:
 
 ```json
 {
@@ -115,9 +128,96 @@ exit code and each app's `template_ready`, then follow its returned relative fil
 from a string hit or a file left by an earlier run. `--out` must not already exist; outputs are staged
 and renamed only after successful processing. An error does not create a partial complete result.
 
+## Automatic Flutter discovery
+
+```bash
+python3 scripts/analyze_dex_response.py application.zip --out work/automatic-case \
+  --blutter-dir /path/to/blutter
+```
+
+The worker reads the Dart snapshot hash through ELF load-segment address mapping and chooses an
+already installed analyzer with the same embedded snapshot hash. `--blutter-bin` selects an explicit
+native analyzer; it must still match. `BLUTTER_HOME` supplies the directory default, otherwise
+`~/tools/blutter` is used. No fetching wrapper is invoked, no target code runs, and no server is contacted.
+Install/build matching Blutter tooling separately for a new snapshot format. Missing or incompatible
+tooling produces an actionable diagnostic, never a fallback to a guessed layout.
+
+The pass disassembles AArch64 executable load segments and reconstructs direct-call, object-pool and
+recoverable lazy-instance-initializer references. Numeric strings require a small-integer untagging
+operation and the decimal conversion table, not merely a MOV immediate. String-literal key accesses
+are also eligible. Candidate key-to-dispatch slices and bounded local register/frame copies identify
+consumer call sites. JNI table slots come from the submitted bridge ELF's symbol relocations.
+Nearby request construction and HTTP-related literals provide investigation context, **not proof
+that a particular server response produced a particular value**.
+
+Names, package IDs, preassigned field order and known application hashes do not select this path.
+Obfuscated helper names are linked only when their metadata appears in the submitted snapshot.
+The snapshot hash selects a parser format, not an application profile.
+
+Complete contract extraction requires the metadata-exporting Blutter extension shipped as
+`build_flutter_semantic_blutter.py` and `blutter_semantic_extension.inc`. After building stock
+Blutter for the required Dart VM, build/install the extension once per compatible VM:
+
+```bash
+python3 scripts/build_flutter_semantic_blutter.py --blutter-dir /path/to/blutter \
+  --dartlib dartvm3.12.2_android_arm64 --out work/blutter-semantic-3.12.2 --install
+```
+
+For the lab APK2 snapshot, use `dartvm3.11.1_android_arm64` in a different fresh output directory.
+The helper copies stock source, reuses already-installed VM packages/build configuration, and
+leaves the stock analyzer intact. It does not download tooling. The default selector prefers the
+matching `_semantic` analyzer. Stock Blutter still provides investigation candidates but lacks the
+metadata needed for a complete contract; the report names this prerequisite.
+
+The extension exports snapshot-derived initializer addresses, object class IDs, builtin class IDs
+and dispatch entries. The worker reads VM stub names as text, never executes generated IDA scripts,
+and follows field values through the parent-ClassLoader call, loader construction, loadClass result,
+payload construction, and Activity entry argument. It checks object identities and argument lists;
+it does not assign roles by numeric-key order. A changed key is recovered from the changed binary.
+
+Advertised automatic AOT coverage is the tested collection/JNI consumer topology: numeric or literal
+map keys, decimal-string/integer list to Uint8List to direct ByteBuffer, class/method identifiers in
+separate fields, instance construction and a void entry taking one Activity. Recompilation across
+the tested Dart snapshots works without app hashes or obfuscated-name selectors. Automatic AOT
+packed-string/array method fields, hardcoded entries, other byte encodings, other JNI libraries and
+arbitrary compiler register allocations are not advertised. Such cases require review; the broader
+Dalvik variations below must not be confused with AOT coverage.
+
+The analysis follows a conditional success path. Concrete type/identity tests are evaluated where
+modeled; unresolved branch predicates are retained as assumptions. GetGlobalEnv is checked against
+ELF relocations for the exported table identity. Candidate slot records still say
+`receiver_proven: false`: the pass assumes standard exported dartjni/Dart helper semantics and does
+not formally verify every native wrapper or every FFI receiver. JSON parsing and request context
+are located, but exact network-response byte provenance is not established. Those limitations are
+included with the generated contract. Do not treat `template_ready` as authorization to modify a
+live server response or as evidence that a load executed. Unknown consumers remain candidates,
+never an automatically actionable replacement for a missing contract.
+
+Limits include 256 MiB per ELF, 64 MiB object pool, four million instructions, 200,000 function hints,
+512 visited graph nodes per context query, 512 slice states per access, 12,000 consumer-slice
+instructions, 256 visited helper nodes, 128 numeric candidates,
+120 seconds per Blutter invocation, and 180 seconds for the worker. Linux workers also use a
+virtual address-space limit of 96 GiB while Blutter runs (Dart 3.12 reserves two 32 GiB guard
+regions), reduced to 4 GiB for the Python analysis phase. This is not a resident-memory limit.
+Budget exhaustion remains visible. These are analysis limits, not a security
+sandbox for third-party parsers. Native Blutter tooling must match the host OS and architecture.
+
+## Optional legacy reviewed profiles
+
+```bash
+python3 scripts/analyze_dex_response.py application.zip --out work/reviewed-case \
+  --reviewed-profiles --print-template
+```
+
+This explicitly enables the previous guarded matching path and requires `dex_response_profiles/`
+beside the script. `--profile /path/local.json` enables only the specified reviewed profile unless
+`--reviewed-profiles` is also supplied. The default never reads that directory. Legacy templates
+remain available as an explicit compatibility mode; automatic APK1–APK3 extraction no longer requires them.
+For legacy-only operation without worker dependencies, combine `--reviewed-profiles --no-semantic`.
+
 ## Automatic Dalvik discovery
 
-When no native profile matches, the worker parses the submitted DEX members and follows response
+Unless an explicitly selected native profile matches, the worker parses submitted DEX members and follows response
 values through app helpers into class loading and reflective entry invocation. Covered variations:
 
 - Nested JSON objects/arrays and new string keys, including recompiled or renamed app classes.
@@ -167,7 +267,7 @@ the supported bytecode forms automatically; its compiled fixtures do not establi
 - Methods already owned by the app: record them in `fixed_calls`; do not invent a corresponding
   response field. A `contract`/`value` constraint rejects incompatible CLI overrides.
 
-The current binary key extractor handles reviewed ARM64 Smi-to-decimal sites only. A profile can
+The legacy profile key extractor handles reviewed ARM64 Smi-to-decimal sites only. A profile can
 use literal string paths where verified code fixes those strings, with all loaded bytes guarded.
 Other framework extractors need their own reviewed implementation and tests.
 
@@ -184,7 +284,7 @@ The remaining fields are `190` (loader class), `253` (loader constructor), `198`
 See [APK3 static evidence](../reports/family2_apk3_20260928/01_code_audit.md).
 Unlike APK1/APK2, APK3 has no HTTP Toolkit or payload-execution validation. Its request
 metadata is labeled `static_reconstruction_not_wire_validated`; historical dynamic proof
-from another APK is not attached to it. All loaded-byte/dependency guards remain enforced.
+from another APK is not attached to it. Loaded-byte/dependency guards apply in legacy profile mode; automatic inference uses the submitted code and snapshot metadata.
 Rebuild only this profile with `python3 scripts/build_reviewed_dex_profiles.py --case apk3`.
 The optional real-sample suite tests its full split ZIP, schema and field values, numeric
 key rotation, rejection of altered call targets/bridge bytes, and missing dependencies.
@@ -243,9 +343,11 @@ keys at audited sites. It is a reproducibility helper, not a learner for unknown
 ```bash
 python3 -m unittest discover -s scripts/tests -p 'test_dex_*.py' -v
 APK_DEFENSE_SAMPLE_TESTS=1 python3 -m unittest discover -s scripts/tests -p 'test_dex_*.py' -v
+APK_DEFENSE_SAMPLE_TESTS=1 python3 -m unittest discover -s scripts/tests -p 'test_flutter_semantic.py' -v
 ```
 
-The optional real-sample tests require the locally held originals, previous capture fixtures, and
+The optional real-sample tests require the locally held originals, previous capture fixtures, generated
+semantic Blutter outputs under `work/family2_apk3_analyzer/semantic-{apk1,apk2,blutter}`, and
 `jsonschema` (test-only; installed in the lab's system Python). They ZIP all APK splits, validate both
 generated templates against the successful HTTP Toolkit loader maps, independently validate the
 JSON Schemas, and check the benign WebView fixture does not produce a positive template.
@@ -269,3 +371,8 @@ results under `work/` in this repository because reports can contain client iden
 The semantic worker has a 60-second parent timeout, 100 candidate roots, a 40,000-instruction budget,
 helper depth of eight, and 128 queued states per function. Budget exhaustion is reported; it is not
 evidence that the app cannot load DEX.
+
+The automatic Flutter contract suite compares all three outputs with independently reviewed
+templates, checks changed-key rebinding and rejects missing dispatch metadata, a changed table
+provider, removed method/copy calls and a wrong invocation receiver. Full ZIP and standalone
+portable runs are recorded in `reports/family2_apk3_20260928/AUTOMATIC_DISCOVERY.md`.

@@ -8,6 +8,7 @@ import re
 import subprocess
 import tempfile
 import zipfile
+from .config import get_config
 
 MAX_INPUT=128*1024**2
 
@@ -17,7 +18,8 @@ def references(data,metadata):
     if validity.get('format')!='dex' or validity.get('validity')!='structurally_inspected':
         return {'format':'code-references/v1','validity':'unsupported','diagnostic':'Requires a structurally inspected standalone DEX','structure':validity.get('validity')}
     bundled=Path(__file__).resolve().parents[1]/'.venvs/analysis/bin/python'
-    python=Path(os.environ['RUNTIME_CODE_ANALYSIS_PYTHON']) if os.environ.get('RUNTIME_CODE_ANALYSIS_PYTHON') else bundled if bundled.is_file() else Path.home()/'tools/venv/bin/python'
+    configured=os.environ.get('RUNTIME_CODE_ANALYSIS_PYTHON') or get_config()['paths']['analysis_python']
+    python=Path(configured).expanduser() if configured else bundled if bundled.is_file() else Path.home()/'tools/venv/bin/python'
     with tempfile.TemporaryDirectory(prefix='runtime-code-index-') as directory:
         root=Path(directory);source=root/'input.dex';source.write_bytes(data)
         with (root/'result.json').open('wb') as output, (root/'errors.log').open('wb') as errors:

@@ -1,0 +1,26 @@
+{
+  "paths": {
+    "adb": "adb",
+    "server_dir": "~/tools/frida-server",
+    "analysis_python": "",
+    "store": "work/runtime-code"
+  },
+  "device": {
+    "serial": ""
+  },
+  "frida": {
+    "version": "17.18.0",
+    "server_port": 27043,
+    "allow_untested_version": false
+  },
+  "timeouts": {
+    "adb": 30,
+    "launch": 90,
+    "process": 30,
+    "connect": 30,
+    "attach": 30,
+    "script_load": 60,
+    "server_start": 15,
+    "pull": 90
+  }
+}
