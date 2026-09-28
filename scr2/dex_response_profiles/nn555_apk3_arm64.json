@@ -1,0 +1,348 @@
+{
+  "format": "apk-defense.loader-profile/v1",
+  "id": "nn555_apk3_arm64",
+  "artifact_path": "lib/arm64-v8a/libapp.so",
+  "original_sha256": "bc7c22768d9db1150da8e6eab8bc77bc21c2894d6e2a8e3a3185341de9012903",
+  "evidence": {
+    "static": "reports/family2_apk3_20260928/01_code_audit.md",
+    "runtime_validation": "not_performed_for_apk3",
+    "claim": "Response map -> byte conversion -> direct ByteBuffer -> response-controlled JNI loader chain"
+  },
+  "segments": [
+    {
+      "offset": 0,
+      "va": 0,
+      "filesz": 953682,
+      "memsz": 953682,
+      "flags": 4,
+      "align": 65536,
+      "sha256": "8a78acf78befe32473a3f771642d525c67145681765dd318f47ca4d529e63039"
+    },
+    {
+      "offset": 983040,
+      "va": 983040,
+      "filesz": 2901824,
+      "memsz": 2901824,
+      "flags": 5,
+      "align": 65536,
+      "sha256": "6d6db2d5330745314ab244d916d3f3c4de49b2797539fd3725d107767ccaafcf"
+    },
+    {
+      "offset": 3932160,
+      "va": 3932160,
+      "filesz": 112,
+      "memsz": 112,
+      "flags": 6,
+      "align": 65536,
+      "sha256": "a02bdfe432a817101204de064c548c5ee020c748c6a790a15e95a1b64987ae45"
+    }
+  ],
+  "key_sites": {
+    "key_00": {
+      "va": 3741964
+    },
+    "key_01": {
+      "va": 3744512
+    },
+    "key_02": {
+      "va": 3744844
+    },
+    "key_03": {
+      "va": 3745048
+    },
+    "key_04": {
+      "va": 3745164
+    },
+    "key_05": {
+      "va": 3745508
+    },
+    "key_06": {
+      "va": 3745644
+    },
+    "key_07": {
+      "va": 3745760
+    },
+    "key_08": {
+      "va": 3746184
+    },
+    "key_09": {
+      "va": 3746300
+    },
+    "key_10": {
+      "va": 3746652
+    },
+    "key_11": {
+      "va": 3746768
+    },
+    "key_12": {
+      "va": 3746920
+    },
+    "key_13": {
+      "va": 3747212
+    },
+    "key_14": {
+      "va": 3747416
+    },
+    "key_15": {
+      "va": 3747532
+    }
+  },
+  "equal_keys": [
+    [
+      "key_00",
+      "key_01",
+      "key_02",
+      "key_03",
+      "key_04"
+    ]
+  ],
+  "elf_normalization": "runtime_notes_v1",
+  "dependencies": [
+    {
+      "path": "lib/arm64-v8a/libdartjni.so",
+      "sha256": "807c709c74c7ec3034862c2272bdc669199a096188b5d4067403a6285df5073c",
+      "runtime_segments": [
+        {
+          "offset": 0,
+          "va": 0,
+          "filesz": 125968,
+          "memsz": 125968,
+          "flags": 5,
+          "align": 16384,
+          "sha256": "a212111a0a0cffd80b40207e6b66ab9b21a9d0e82ee13e7f6971ed03552a7cb1"
+        },
+        {
+          "offset": 125968,
+          "va": 142352,
+          "filesz": 1376,
+          "memsz": 5104,
+          "flags": 6,
+          "align": 16384,
+          "sha256": "83a4a81836df66702341989bce874b4081c40acbd6e87d210829addba0d23612"
+        },
+        {
+          "offset": 127344,
+          "va": 160112,
+          "filesz": 1784,
+          "memsz": 2424,
+          "flags": 6,
+          "align": 16384,
+          "sha256": "4c7923626067db35875c2a906fbf633df40667f9aa0335ed8e9f44d0f25b5386"
+        }
+      ]
+    }
+  ],
+  "bindings": [
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_05"
+        }
+      ],
+      "role": "loader_class",
+      "value": "dalvik/system/InMemoryDexClassLoader",
+      "evidence": {
+        "report": "reports/family2_apk3_20260928/01_code_audit.md",
+        "key_va": "0x3926e4",
+        "consumer": "Java class resolved with FindClass"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_06"
+        }
+      ],
+      "role": "dex_bytes",
+      "value": "DEX ARRAY",
+      "evidence": {
+        "report": "reports/family2_apk3_20260928/01_code_audit.md",
+        "key_va": "0x39276c",
+        "consumer": "elements int.parse(item.toString()) -> Uint8List -> direct Java ByteBuffer"
+      },
+      "provenance": "placeholder"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_07"
+        }
+      ],
+      "role": "loader_constructor",
+      "value": "(Ljava/nio/ByteBuffer;Ljava/lang/ClassLoader;)V",
+      "evidence": {
+        "report": "reports/family2_apk3_20260928/01_code_audit.md",
+        "key_va": "0x3927e0",
+        "consumer": "constructor descriptor, ByteBuffer and Activity-derived object arguments"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_08"
+        }
+      ],
+      "role": "parent_method",
+      "value": "getClassLoader",
+      "evidence": {
+        "report": "reports/family2_apk3_20260928/01_code_audit.md",
+        "key_va": "0x392988",
+        "consumer": "Activity instance method name, no arguments, object return"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_09"
+        }
+      ],
+      "role": "parent_descriptor",
+      "value": "()Ljava/lang/ClassLoader;",
+      "evidence": {
+        "report": "reports/family2_apk3_20260928/01_code_audit.md",
+        "key_va": "0x3929fc",
+        "consumer": "descriptor paired with 198"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_10"
+        }
+      ],
+      "role": "load_class_method",
+      "value": "loadClass",
+      "evidence": {
+        "report": "reports/family2_apk3_20260928/01_code_audit.md",
+        "key_va": "0x392b5c",
+        "consumer": "loader instance method name, single String argument, Class result"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_11"
+        }
+      ],
+      "role": "load_class_descriptor",
+      "value": "(Ljava/lang/String;)Ljava/lang/Class;",
+      "evidence": {
+        "report": "reports/family2_apk3_20260928/01_code_audit.md",
+        "key_va": "0x392bd0",
+        "consumer": "descriptor paired with 432"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_12"
+        }
+      ],
+      "role": "payload_class",
+      "value": {
+        "contract": "payload_class"
+      },
+      "evidence": {
+        "report": "reports/family2_apk3_20260928/01_code_audit.md",
+        "key_va": "0x392c68",
+        "consumer": "method 432 argument, target class name"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_13"
+        }
+      ],
+      "role": "payload_constructor",
+      "value": "()V",
+      "evidence": {
+        "report": "reports/family2_apk3_20260928/01_code_audit.md",
+        "key_va": "0x392d8c",
+        "consumer": "descriptor for zero-argument constructor on returned class"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_14"
+        }
+      ],
+      "role": "entry_method",
+      "value": {
+        "contract": "entry_method"
+      },
+      "evidence": {
+        "report": "reports/family2_apk3_20260928/01_code_audit.md",
+        "key_va": "0x392e58",
+        "consumer": "entry instance method name, Activity argument, void adapter"
+      },
+      "provenance": "compatible_benign_test_contract"
+    },
+    {
+      "path": [
+        {
+          "key": "key_04"
+        },
+        {
+          "key": "key_15"
+        }
+      ],
+      "role": "entry_descriptor",
+      "value": {
+        "contract": "entry_descriptor"
+      },
+      "evidence": {
+        "report": "reports/family2_apk3_20260928/01_code_audit.md",
+        "key_va": "0x392ecc",
+        "consumer": "descriptor paired with 627"
+      },
+      "provenance": "compatible_benign_test_contract"
+    }
+  ],
+  "fixed_calls": [],
+  "request": {
+    "method": "GET",
+    "url": "https://botalmatchingale.zilch-flip-api.com/api/current/preproduction",
+    "provenance": "static_reconstruction_not_wire_validated"
+  },
+  "coverage": "Same loaded ARM64 code/data and bridge; allows reviewed MOVZ numeric-key rotations, GNU build IDs and section-table metadata changes. New AOT instruction layouts require review."
+}

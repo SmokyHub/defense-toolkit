@@ -171,6 +171,24 @@ The current binary key extractor handles reviewed ARM64 Smi-to-decimal sites onl
 use literal string paths where verified code fixes those strings, with all loaded bytes guarded.
 Other framework extractors need their own reviewed implementation and tests.
 
+## Reviewed APK3 (Dart 3.12.2)
+
+The family2 split set `apks/family2/apk3/bbottalmachingp/` is covered by
+`nn555_apk3_arm64`. Its recompilation changes the loaded-code fingerprints and instruction
+addresses, so older profiles correctly returned `needs_review`. The reviewed path keeps the
+same loader/entry call shape with outer key `578` and byte-list path `578.578`.
+The remaining fields are `190` (loader class), `253` (loader constructor), `198`/`204`
+(parent method/descriptor), `432`/`117` (loadClass method/descriptor), `477` (payload class),
+`574` (payload constructor), and `627`/`600` (entry method/descriptor).
+
+See [APK3 static evidence](../reports/family2_apk3_20260928/01_code_audit.md).
+Unlike APK1/APK2, APK3 has no HTTP Toolkit or payload-execution validation. Its request
+metadata is labeled `static_reconstruction_not_wire_validated`; historical dynamic proof
+from another APK is not attached to it. All loaded-byte/dependency guards remain enforced.
+Rebuild only this profile with `python3 scripts/build_reviewed_dex_profiles.py --case apk3`.
+The optional real-sample suite tests its full split ZIP, schema and field values, numeric
+key rotation, rejection of altered call targets/bridge bytes, and missing dependencies.
+
 ## Adding a reviewed profile
 
 Pass local JSON with `--profile /path/to/reviewed-profile.json`. Profiles in the input ZIP are
@@ -216,8 +234,8 @@ The [Flutter reference](../.agents/skills/blutter-flutter-dart/references/respon
 describe that analysis. No complete native family1 server-response schema has been established,
 so those native inputs cannot honestly be auto-filled by this version.
 
-`python3 scripts/build_reviewed_dex_profiles.py` regenerates the bundled profiles from the two
-original local ELF files and reviewed reports. It verifies the original library hashes and extracts
+`python3 scripts/build_reviewed_dex_profiles.py` regenerates the bundled profiles from the three
+reviewed local ELF files and reviewed reports. It verifies the original library hashes and extracts
 keys at audited sites. It is a reproducibility helper, not a learner for unknown apps.
 
 ## Validation and resource limits

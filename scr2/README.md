@@ -15,8 +15,10 @@ response JSON with `"DEX ARRAY"` instead of real DEX bytes. Reports, templates a
 are also saved under the new output directory. The tested default contract is
 `com.apkdefense.fixture.webview.ResponseEntry.run(android.app.Activity)`.
 
-Both reviewed NN555 Flutter ARM64 profiles and the bounded Dalvik consumer analyzer are
+All three reviewed NN555 Flutter ARM64 profiles (APK1, APK2 and APK3/Dart 3.12.2) and the bounded Dalvik consumer analyzer are
 included. Unsupported variants report review status, not an invented schema. This is offline
 static analysis: no app execution, Frida, device, server contact or upload is needed.
 For profile-only matching without Androguard, use system Python with `--no-semantic`.
 See `technical-notes.md` for exact coverage (its paths describe the original lab layout).
+
+APK3 uses outer key `578`; support is statically reviewed, with no APK3 runtime validation.
