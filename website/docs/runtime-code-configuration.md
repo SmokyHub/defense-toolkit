@@ -139,3 +139,45 @@ Java/platform hooks do not provide universal visibility into Flutter's Dart AOT 
 
 Host configuration/startup paths are regression-tested using simulated device responses.
 A macOS Android 14 ARM emulator live run has not been validated in this lab.
+
+## Diagnose a freeze on the same PC
+
+Add `--debug` to `watch` or `capture`. For the portable website fixture:
+
+```bash
+./runtime-code watch --device SERIAL --app lab.runtimecode.flow \
+  --pack test-apk/live-pack.json --no-static --debug
+```
+
+Debug mode opens a local HTML diagnostic page before device preparation and attachment.
+`--no-open` suppresses automatic opening; its `file:///.../report.html` URL is always printed.
+Each attempt writes a unique directory under `<store>/diagnostics/debug-*/`, containing
+`report.html`, `status.json`, `checkpoints.jsonl`, and, after a stall, `host-threads.txt`.
+The page refreshes every two seconds and gives a short status code and an explanation;
+it can be read entirely on the affected PC without transferring logs. Reports retain
+stall incidents after a clean shutdown. If the collector is forcibly killed, the last
+report remains on disk; check its update timestamp because it cannot keep monitoring.
+
+The host watchdog is a separate Python thread and uses neither Frida RPC nor SQLite.
+After ten seconds without the expected progress, it distinguishes:
+
+- `HOST_CALL_STALLED`: an ADB, attach, script load or another named host operation has not returned.
+- `TARGET_STARTUP_STALLED`: the agent started but never reported readiness. Checkpoints bracket
+  Java bridge evaluation, Java availability, entry into `Java.perform`, individual platform hook
+  installation, DEX hooks and native observer installation.
+- `AGENT_HEARTBEAT_MISSING`: the agent's two-second JavaScript heartbeat stopped; an agent-thread
+  block, transport interruption or process failure remains possible.
+- `ANDROID_MAIN_THREAD_STALLED`: JavaScript heartbeats continue, but the scheduled main-thread
+  callback has not returned. Only one callback can be outstanding at a time.
+- `AGENT_ERROR`: an instrumentation error was delivered; its stack is retained locally.
+
+Heartbeats include bounded names of active Java flow/DEX callbacks, with no argument values.
+Host stack dumps contain Python stack locations, not Android native thread stacks. Last-seen
+checkpoints narrow the failing boundary; they do not prove a deadlock or its root cause.
+The watchdog cannot recover a blocked target or continue if the host interpreter itself stops
+executing. Debug mode adds timing overhead and is off by default. The main-thread probe runs
+only after Java hooks are ready; inventory-only packs do not initialize a Java bridge.
+
+Automated validation covers a blocked host call, missing agent heartbeat, an unanswered main-thread
+probe, retained reports, bounded diagnostic callbacks, bootstrap ordering and JavaScript syntax.
+This does not establish live Android 16 ARM/macOS compatibility or resolve an unobserved freeze.

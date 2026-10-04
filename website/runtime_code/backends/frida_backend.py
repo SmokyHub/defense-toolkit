@@ -12,6 +12,7 @@ import time
 
 from ..model import Capability
 from ..config import get_config, config_source
+from .. import diagnostics
 from . import register
 
 
@@ -31,7 +32,8 @@ def adb(serial,*args,timeout=None,stage=None):
     seconds=timeout if timeout is not None else get_config()['timeouts']['adb']
     command=[get_config()['paths']['adb'],*(['-s',serial] if serial else []),*args]
     try:
-        result=subprocess.run(command,capture_output=True,text=True,timeout=seconds,check=True)
+        with diagnostics.phase(stage or 'ADB '+' '.join(args[:3])):
+            result=subprocess.run(command,capture_output=True,text=True,timeout=seconds,check=True)
     except subprocess.TimeoutExpired as error:
         operation=stage or 'ADB '+' '.join(args[:5])
         raise TimeoutError(f'{operation} on {serial or "host"} timed out after {seconds}s; inspect the emulator/app logs and adjust the corresponding timeouts setting in runtime-code.local.json') from error
@@ -43,7 +45,7 @@ def frida_deadline(stage,seconds=None):
     """Cancel transport waits and identify the stalled startup operation."""
     import frida
     seconds=get_config()['timeouts']['connect'] if seconds is None else seconds
-    with frida.Cancellable() as cancel:
+    with frida.Cancellable() as cancel, diagnostics.phase(stage):
         expired=threading.Event()
         def expire():
             expired.set();cancel.cancel()
@@ -120,6 +122,7 @@ class FridaBackend:
         self.forward_port=None
         self.remote_endpoint=None
         self.companions=[]
+        self.debug=False
 
     def configure_scripts(self,paths):
         if len(paths)>8:raise ValueError('--script accepts at most 8 files')
@@ -280,6 +283,7 @@ class FridaBackend:
             supported.append(Capability(name,(),(),False,'No validated implementation/profile in this release; no automatic fallback'))
         return supported
 
+    @diagnostics.operation('Assembling instrumentation source')
     def source(self,pack,profile=None,linker_profile=None):
         scoped=[t for t in pack.tokens if t.capability in ('flow.java','parser.custom','crypto.custom')]
         for i,left in enumerate(scoped):
@@ -294,7 +298,9 @@ class FridaBackend:
         source=(Path(__file__).with_name('frida_agent.js')).read_text().replace('__CONFIG__',json.dumps({**pack.json(),'art_profile':profile,'linker_profile':linker_profile,'jni_table':jni}))
         source=source.replace('// TRACE_EXTENSION',Path(__file__).with_name('frida_flows.js').read_text()+'\n'+Path(__file__).with_name('frida_object_flow.js').read_text())
         if any(t.capability in ('dex.input.java','jni.trace.selected','webview.platform','network.platform','parser.json','parser.custom','crypto.cipher','crypto.custom','reflection.java','flow.java') for t in pack.tokens):
-            source=self.java_bridge_source()+source
+            source='runtimeDebug.mark("java.bridge.begin");\n'+self.java_bridge_source()+'runtimeDebug.mark("java.bridge.loaded");\n'+source
+        debug_source=Path(__file__).with_name('frida_diagnostics.js').read_text() if self.debug else 'const runtimeDebug={mark(){},ready(){},enter(){},leave(){},stop(){}};\n'
+        source=debug_source+'\n'+source
         if ('Mod'+'ule.') in source:
             raise RuntimeError('Forbidden runtime namespace in assembled agent')
         return source
@@ -370,6 +376,8 @@ class FridaBackend:
         if system.get('access')=='jailed':
             raise RuntimeError('Full Frida server access unavailable. Start the matching rooted frida-server; APK/Gadget modification is not used.')
         device_info['host_configuration']={'source':config_source(),'timeouts':dict(get_config()['timeouts']),'configured_frida':dict(get_config()['frida'])}
+        if diagnostics._active:
+            diagnostics._active.record('device.configuration', device=device_info, frida=frida.__version__, pack=pack.id)
         device_info['frida']=frida.__version__
         device_info['frida_compatibility']=compatibility
         device_info['frida_transport']={'kind':'adb_forward' if self.server_port else 'device_default',
@@ -383,11 +391,13 @@ class FridaBackend:
             'exclusions':{t.name:t.selection for t in pack.tokens},'limits':asdict(pack.limits)})
         spawned=False
         if pid is None:
-            pid=self.device.spawn([app]);spawned=True
+            with diagnostics.phase('Spawning suspended app'):
+                pid=self.device.spawn([app]);spawned=True
         try:
             self.attach(pid,app,'spawned_suspended' if spawned else 'late_attached')
         finally:
-            if spawned:self.device.resume(pid)
+            if spawned:
+                with diagnostics.phase('Resuming spawned app'):self.device.resume(pid)
         self.poller=threading.Thread(target=self.poll,daemon=True);self.poller.start()
 
     def attach(self,pid,name,mode):
@@ -406,10 +416,17 @@ class FridaBackend:
                 script=session.create_script(self.code)
             self.sessions[process]={'pid':pid,'session':session,'script':script}
             def message(message,data):
-                if message.get('type')=='send':self.service.submit(process,message['payload'],data)
-                elif message.get('type')=='error':self.service.submit(process,{'kind':'instrumentation.failure','data':message})
+                if message.get('type')=='send':
+                    payload=message['payload']
+                    if isinstance(payload,dict) and 'runtime_diagnostic' in payload:
+                        diagnostics.target(pid,payload['runtime_diagnostic'])
+                    else:self.service.submit(process,payload,data)
+                elif message.get('type')=='error':
+                    diagnostics.target(pid,{'kind':'error','error':message.get('stack',message.get('description',str(message)))})
+                    self.service.submit(process,{'kind':'instrumentation.failure','data':message})
             script.on('message',message)
             def detached(reason,*args):
+                diagnostics.target(pid,{'kind':'detached','error':reason})
                 self.service.submit(process,{'kind':'lifecycle.detached','data':{'reason':reason}})
                 with self.lock:
                     item=self.sessions.pop(process,None)
@@ -472,6 +489,7 @@ class FridaBackend:
         if not item:raise ValueError('Snapshot unavailable: process is disconnected')
         return self.bounded_rpc(item,'snapshot',target)
 
+    @diagnostics.operation('Stopping instrumentation and detaching')
     def stop(self):
         import frida
         self.poll_stop.set()

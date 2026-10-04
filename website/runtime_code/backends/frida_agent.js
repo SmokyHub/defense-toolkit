@@ -2,6 +2,7 @@
 // This adapter only uses the process runtime namespace. Third-party bridge loading
 // is isolated and checked by the host before this source is installed.
 const config = __CONFIG__;
+runtimeDebug.mark('collector.source.enter');
 let sequence = 0, serial = 0, stopped = false, queuedBytes = 0;
 const owned = new Map(), guards = new Set(), hooks = [], tokens = new Map(), loads = new Map();
 const regions = new Map(), nativeHooks = [];
@@ -346,18 +347,26 @@ function installJni() {
       'Java stack origins may lack artifact references','Processing time uses millisecond clock resolution']});
 }
 function installJava() {
+  runtimeDebug.mark('java.availability.check');
   if(typeof Java==='undefined'||!Java.available){
     try { frameworkCoverage(); } catch(e) {}
     for(const token of config.tokens)if(token.capability!=='network.native'&&token.capability!=='native.inventory')event('coverage',{token:token.name,state:'unsupported',reason:'Java VM unavailable; no managed runtime traversal attempted'});
-    event('instrumentation.ready',{java:false,coverage:'native_only_java_unavailable'});return;
+    event('instrumentation.ready',{java:false,coverage:'native_only_java_unavailable'});runtimeDebug.ready(false);return;
   }
+  runtimeDebug.mark('java.perform.waiting');
   Java.perform(() => {
+    runtimeDebug.mark('java.perform.entered');
+    runtimeDebug.mark('java.framework.discovery');
     try { frameworkCoverage(); } catch(e) {}
+    runtimeDebug.mark('java.object_flow.install');
     try { if(tokens.has('flow.java'))installObjectFlow(); } catch(e) { event('coverage.gap',{reason:'object_flow_installation',error:String(e)}); }
+    runtimeDebug.mark('java.platform_hooks.install');
     try { installFlows(); } catch(e) { event('coverage.gap', {reason:'flow_installation',error:String(e)}); }
+    runtimeDebug.mark('java.jni_hooks.install');
     if(tokens.has('jni.trace.selected')) installJni();
     const bufferToken = tokens.get('dex.input.java');
     if (bufferToken) {
+      runtimeDebug.mark('java.dex_loader.resolve');
       const Loader = Java.use('dalvik.system.InMemoryDexClassLoader');
       const Buffer = Java.use('java.nio.ByteBuffer');
       const BaseBuffer = Java.use('java.nio.Buffer');
@@ -365,9 +374,12 @@ function installJava() {
       for (const overload of Loader.$init.overloads) {
         const sig = overload.argumentTypes.map(t => t.className);
         if (!['java.nio.ByteBuffer', '[Ljava.nio.ByteBuffer;'].includes(sig[0])) continue;
+        runtimeDebug.mark('java.dex_loader.hook:'+sig.join(','));
         overload.implementation = function () {
           const args = Array.from(arguments), tid = Process.getCurrentThreadId();
           if (loads.has(tid)) return overload.apply(this, args);
+          const debugCall=runtimeDebug.enter('InMemoryDexClassLoader('+sig.join(',')+')');
+          try {
           const attempt = 'load-' + (++serial);
           loads.set(tid, attempt);
           withGuard(() => {
@@ -419,6 +431,7 @@ function installJava() {
             event('load.outcome', {correlation: attempt, outcome: 'threw', error: String(e), token: bufferToken.name});
             throw e;
           } finally { loads.delete(tid); }
+          } finally { runtimeDebug.leave(debugCall); }
         };
         hooks.push(overload); installed++;
       }
@@ -429,12 +442,15 @@ function installJava() {
     }
     event('instrumentation.ready', {java: true, tokens: config.tokens.map(t => t.name),
       startup_coverage: 'Java hooks active at this event; earlier events may be missed'});
+    runtimeDebug.mark('java.hooks.ready');
+    runtimeDebug.ready(true);
   });
 }
 let observer = null;
 let triggerObserver = null;
 const nativeToken = tokens.get('native.inventory');
 if (nativeToken) {
+  runtimeDebug.mark('native.module_observer.install');
   let initial = true;
   observer = Process.attachModuleObserver({
     onAdded(module) {
@@ -447,6 +463,7 @@ if (nativeToken) {
     onRemoved(module) { event('native.removed', {token: nativeToken.name, path: module.path, base: module.base.toString()}); }
   });
   initial = false;
+  runtimeDebug.mark('native.module_observer.installed');
 }
 rpc.exports = {
   acknowledge(transfer) { const entry = owned.get(transfer); if (entry) {queuedBytes -= entry.size; owned.delete(transfer);} },
@@ -454,6 +471,7 @@ rpc.exports = {
   snapshot(id) { return snapshotRegion(id,'manual'); },
   regions() { return Array.from(regions, ([id,r]) => ({id,base:r.base.toString(),size:r.size})); },
   stop() {
+    runtimeDebug.mark('agent.stop.enter');
     event('loss', Object.assign({pending_transfers: owned.size, pending_bytes: queuedBytes}, losses));
     for (const hook of hooks) hook.implementation = null;
     if(typeof stopObjectFlow==='function')stopObjectFlow();
@@ -464,6 +482,7 @@ rpc.exports = {
     while(eventRing.length)flushEvents();
     stopped = true;
     owned.clear(); queuedBytes = 0;
+    runtimeDebug.stop();
     return losses;
   }
 };
@@ -476,7 +495,9 @@ setInterval(() => {
     }
   }
 }, 1000);
+runtimeDebug.mark('native.art.install');
 installArt();
+runtimeDebug.mark('native.linker.install');
 installLinker();
 if(tokens.has('dex.snapshot.runtime') && tokens.get('dex.snapshot.runtime').trigger==='native_function') {
   const token=tokens.get('dex.snapshot.runtime');
@@ -506,6 +527,8 @@ if (tokens.has('dex.snapshot.runtime') && tokens.get('dex.snapshot.runtime').tri
   setInterval(() => {for(const id of regions.keys()) {try{snapshotRegion(id,'poll');}catch(e){event('coverage.gap',{reason:String(e),logical_id:id});}}},config.limits.snapshot_interval_ms);
 }
 // TRACE_EXTENSION
+runtimeDebug.mark('native.network.install');
 try { installNativeNetwork(); } catch(e) { event('coverage.gap',{reason:'native_network_installation',error:String(e)}); }
 if (['dex.input.java','jni.trace.selected','webview.platform','network.platform','parser.json','parser.custom','crypto.cipher','crypto.custom','reflection.java','flow.java'].some(x=>tokens.has(x))) installJava();
-else event('instrumentation.ready', {java: false, tokens: config.tokens.map(t => t.name)});
+else {event('instrumentation.ready', {java: false, tokens: config.tokens.map(t => t.name)});runtimeDebug.ready(false);}
+runtimeDebug.mark('collector.source.loaded');

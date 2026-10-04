@@ -11,6 +11,7 @@ from .analysis import HANDLERS,discover_handlers
 from .service import Service
 from .store import Store
 from .config import load_config, config_source, write_example
+from .diagnostics import Diagnostics, phase
 
 
 def main():
@@ -62,8 +63,12 @@ def main():
     c=sub.add_parser('command');c.add_argument('id')
     for command_parser in sub.choices.values():
         command_parser.add_argument('--config',default=argparse.SUPPRESS,help='Machine-local JSON settings file')
+    for name in ('watch','capture'):
+        sub.choices[name].add_argument('--debug',action='store_true',help='Live local HTML diagnostic report, startup checkpoints and independent stall watchdog')
     args=parser.parse_args()
     store=None
+    diagnostic=None
+    outcome='finished'
     try:
         if args.command=='config' and args.action=='init':
             write_example(args.out);print(json.dumps({'created':args.out}));return
@@ -86,6 +91,11 @@ def main():
             if not 0<=args.seconds<=86400 or (not watching and not args.seconds):raise ValueError('seconds must be in (0, 86400], or 0 for continuous watch')
             pack=Pack.parse(json.loads(Path(args.pack).read_text()))
             backend=registry[args.backend]()
+            if args.debug:
+                diagnostic=Diagnostics(store.root/'diagnostics',{'app':args.app,'device':args.device,'pack':pack.id,
+                    'backend':args.backend,'config':config_source(),'timeouts':settings['timeouts']}).start()
+                backend.debug=True
+                if watching and not args.no_open and not args.no_web:diagnostic.open_browser()
             negotiate(pack,backend.capabilities(),HANDLERS)
             if args.script:
                 if not hasattr(backend,'configure_scripts'):raise ValueError('Selected backend does not support --script; no scripts or capture started')
@@ -101,7 +111,9 @@ def main():
                 args.pid=backend.prepare_watch(args.device,args.app)
                 print(json.dumps({'startup':'Attaching instrumentation','pid':args.pid}),file=sys.stderr,flush=True)
                 args.ui_port=None if args.no_web else args.port
-            run=service.start(backend,pack,args.app,args.device,args.pid)
+            with phase('Starting capture service'):
+                run=service.start(backend,pack,args.app,args.device,args.pid)
+            if diagnostic:diagnostic.record('run.created',run=run)
             print(json.dumps({'run':run,'state':'running'}),flush=True)
             log_path=store.root/(run+'.jsonl');cursor=0
             server=None
@@ -124,7 +136,8 @@ def main():
                         if not hasattr(backend,'static_input_files'):raise ValueError('Selected backend cannot copy installed code; supply --code')
                         with tempfile.TemporaryDirectory(prefix='runtime-installed-code-') as directory:
                             for path,source in backend.static_input_files(directory):
-                                print(json.dumps({'static_index':service.index_code(run,path,source)}),flush=True)
+                                with phase('Indexing installed APK'):
+                                    print(json.dumps({'static_index':service.index_code(run,path,source)}),flush=True)
                 except Exception as error:
                     service.store.observe(run,None,'coverage.static_index',{'state':'partial_or_failed','reason':str(error)})
                     print(json.dumps({'static_index_error':str(error)}),flush=True)
@@ -191,10 +204,15 @@ def main():
             result=[r for r in result if matches(r,include,exclude) and args.query.casefold() in json.dumps(r).casefold()]
         print(json.dumps(result,indent=2))
     except KeyboardInterrupt:
+        outcome='interrupted'
         print(json.dumps({'state':'interrupted'}),file=sys.stderr,flush=True)
     except Exception as error:
+        outcome='failed'
+        if diagnostic:diagnostic.record('host.error',stage='Command',error=str(error))
         print(json.dumps({'error':str(error)}),file=sys.stderr);sys.exit(2)
     finally:
         if store:
-            service.release_target()
-            store.close()
+            with phase('Closing local store'):
+                service.release_target()
+                store.close()
+        if diagnostic:diagnostic.close(outcome)

@@ -22,6 +22,16 @@ Any connected Android device can be selected; no designated image or device allo
 See [configuration examples and troubleshooting](docs/runtime-code-configuration.md), including
 a Mac emulator example. Use `--config /path/mac.json` to select a different settings file.
 
+For a freeze during instrumentation, add `--debug` to the same command. A separate local
+diagnostic page opens before attachment and identifies the last startup/hook checkpoint,
+host waits, missing agent heartbeats or an unresponsive Android main thread. It works
+without copying logs to another PC. See [freeze diagnostics](docs/runtime-code-configuration.md#diagnose-a-freeze-on-the-same-pc).
+
+```bash
+./runtime-code watch --device SERIAL --app lab.runtimecode.flow \
+  --pack test-apk/live-pack.json --no-static --debug
+```
+
 ## Browse saved evidence
 
 Copy the entire saved store directory from the original PC after stopping its collector/server

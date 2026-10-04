@@ -54,6 +54,7 @@ function payload(token,bytes,context,total,retain=true){
  return result;
 }
 function flowHook(token,name,method,handlers){
+ runtimeDebug.mark('java.hook.resolve:'+name+'.'+method);
  let Class;
  try{Class=Java.use(name);if(!Class[method]){remember(flowMissing,token.name+':'+name+'.'+method,'method unavailable');return;}}
  catch(e){remember(flowMissing,token.name+':'+name+'.'+method,flowText(e));return;}
@@ -81,9 +82,12 @@ function flowHook(token,name,method,handlers){
   if(flowHooks.has(key))continue;
   if(token.capability==='flow.java'&&!reserveObjectHook(token,key))continue;
   flowHooks.add(key);
+  runtimeDebug.mark('java.hook.install:'+key);
   overload.implementation=function(){
    const args=Array.from(arguments),tid=Process.getCurrentThreadId();
    if(guards.has(tid)||!selected(token,name))return overload.apply(this,args);
+   const debugCall=runtimeDebug.enter(key);
+   try {
    if(handlers.accept){let accepted=false;withGuard(()=>{accepted=handlers.accept.call(this,args);});if(!accepted)return overload.apply(this,args);}
    const previous=flowThreads.get(tid),ctx={id:'flow-'+(++serial),kind:handlers.kind,token:token.name,
      api:key,started_ms:Date.now(),caller:[],parent:previous||null,signature,return_type:overload.returnType.className};
@@ -97,8 +101,10 @@ function flowHook(token,name,method,handlers){
     withGuard(()=>{ctx.outcome='threw';ctx.error=flowText(e);if(handlers.error)handlers.error.call(this,args,e,ctx);ctx.ended_ms=Date.now();if(!ctx.skip)event(ctx.kind,ctx);});
     throw e;
    }finally{if(previous)flowThreads.set(tid,previous);else flowThreads.delete(tid);}
+   } finally { runtimeDebug.leave(debugCall); }
   };
   hooks.push(overload);
+  runtimeDebug.mark('java.hook.installed:'+key);
  }
 }
 function hookStream(token,stream,exchange,direction,context){
