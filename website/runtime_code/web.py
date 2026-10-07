@@ -41,7 +41,27 @@ def serve(service,run,port=8765,background=False):
                 self.reply(403,{'error':'Local workspace token required'});return
             try:
                 if path.path=='/api/evidence':
-                    self.reply(200,service.evidence(run,parse_qs(path.query).get('observation',[''])[0]));return
+                    from .search_filters import query_filters
+                    query=parse_qs(path.query)
+                    _,include,exclude=query_filters(query.get('q',[''])[0],query.get('include',[''])[0],query.get('exclude',[''])[0])
+                    self.reply(200,service.evidence(run,query.get('observation',[''])[0],int(query.get('depth',['8'])[0]),include,exclude));return
+                if path.path=='/api/logcat':
+                    from .logcat import read_logcat
+                    self.reply(200,read_logcat(service,run,int(parse_qs(path.query).get('after',['0'])[0])));return
+                if path.path in ('/api/strings','/api/strings/export'):
+                    from .string_transforms import collect,export
+                    query=parse_qs(path.query);filters={name:query.get(name,[''])[0] for name in ('include','exclude')}
+                    filters.update(query=query.get('q',[''])[0],since_ns=int(query.get('since_ns',['0'])[0]),depth=int(query.get('depth',['8'])[0]))
+                    if path.path.endswith('/export'):
+                        format=query.get('format',['txt'])[0];name,raw=export(service,run,format,**filters)
+                        self.reply(200,raw,'text/plain; charset=utf-8' if format=='txt' else 'application/x-ndjson',name)
+                    else:
+                        result=collect(service,run,**filters);result['total_pair_count']=len(result['pairs'])
+                        method=query.get('method',[''])[0]
+                        if method:result['pairs']=[p for p in result['pairs'] if p['method']==method]
+                        result['pair_count']=len(result['pairs']);result['pairs']=result['pairs'][:200];result['selected_method']=method
+                        self.reply(200,result)
+                    return
                 if path.path=='/api/code':
                     from .code_index import search
                     query=parse_qs(path.query)
@@ -75,7 +95,7 @@ def serve(service,run,port=8765,background=False):
                         row=service.store.one('SELECT run_id FROM snapshots WHERE id=?',(data[name],))
                         if row['run_id']!=run:raise ValueError('Artifact belongs to another Run')
                 if action=='clear-workspace':result=service.clear_workspace(run)
-                elif action=='flow-scope':result=service.flow_scope(run,data['observation'],data.get('scope_class'))
+                elif action=='flow-scope':result=service.flow_scope(run,data['observation'],data.get('scope_class'),data.get('depth',5),data.get('exclude',''),data.get('decoder') is True)
                 elif action=='code-scope':result=service.code_scope(run,data['snapshot'],data['method'],data.get('decoder') is True)
                 elif action=='analyze':result=service.analyze(data['snapshot'],data.get('handler','structure'))
                 elif action=='snapshot':result=service.request_snapshot(run,data['process'],data['target'])

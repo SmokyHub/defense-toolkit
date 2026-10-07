@@ -10,8 +10,28 @@ const nativeLoads = new Map();
 const jniCalls = new Map();
 const triggerHooks = new Map();
 const eventRing=[];let flushScheduled=false;
+const transferQueue=[];let transferFlushScheduled=false;
 const losses = {skipped_captures: 0, dropped_bytes: 0, queue_overflow: 0, emitted_events: 0, capture_time_ms: 0};
+const traceRetained=new Set(),tracePending=new Map();
 for (const token of config.tokens) tokens.set(token.capability, token);
+function acknowledgeOwned(transfer,verified=false){
+  const entry=owned.get(transfer);
+  if(entry){
+    queuedBytes-=entry.size;owned.delete(transfer);
+    if(entry.trace_key){
+      tracePending.delete(entry.trace_key);
+      if(verified){traceRetained.add(entry.trace_key);if(traceRetained.size>1024)traceRetained.delete(traceRetained.values().next().value);}
+    }
+  }
+}
+function receiveAcknowledgement(){
+  recv('runtime.acknowledge',message=>{
+    const value=message.payload;
+    if(value&&typeof value.transfer==='string')acknowledgeOwned(value.transfer,value.verified===true);
+    if(!stopped)receiveAcknowledgement();
+  });
+}
+receiveAcknowledgement();
 
 function event(kind, data, binary) {
   if (stopped) return false;
@@ -34,6 +54,27 @@ function flushEvents(){
   for(let n=0;n<32&&eventRing.length;n++){const entry=eventRing.shift();send(entry[0],entry[1]);losses.emitted_events++;
     if(entry[0].kind==='jni.call')losses.jni_emitted_calls=(losses.jni_emitted_calls||0)+1;}
   if(eventRing.length&&!flushScheduled){flushScheduled=true;setImmediate(flushEvents);}
+  scheduleTransfers();
+}
+function scheduleTransfers(){
+  if(transferQueue.length&&!transferFlushScheduled&&!stopped){transferFlushScheduled=true;setImmediate(flushTransfers);}
+}
+function flushTransfers(){
+  transferFlushScheduled=false;
+  for(let n=0;n<8&&transferQueue.length;n++){
+    const transfer=transferQueue[0],entry=owned.get(transfer);
+    if(!entry){transferQueue.shift();continue;}
+    const needed=2+Math.ceil(entry.size/262144);
+    if(eventRing.length+needed>config.limits.queue_depth)break;
+    transferQueue.shift();
+    event('capture.begin',entry.begin);
+    for(let offset=0;offset<entry.size;offset+=262144){
+      event('transfer.chunk',{transfer,offset},entry.bytes.slice(offset,Math.min(entry.size,offset+262144)));
+    }
+    event('capture.end',{transfer});
+  }
+  // A full ring waits for flushEvents to make room, without discarding owned bytes.
+  if(transferQueue.length&&eventRing.length===0)scheduleTransfers();
 }
 function gap(token, reason, size) {
   losses.skipped_captures++;
@@ -51,34 +92,29 @@ function stack() {
 function capture(token, bytes, metadata, start) {
   const captureThread=Process.getCurrentThreadId(),observedTime=Date.now();
   const length = bytes.byteLength;
+  const sha256 = Checksum.compute('sha256', bytes);
+  const traceKey=metadata.kind==='trace_payload'?token.name+':'+sha256:null;
+  if(traceKey&&(traceRetained.has(traceKey)||tracePending.has(traceKey))){losses.trace_values_reused=(losses.trace_values_reused||0)+1;return;}
   if (length > config.limits.capture_bytes) { gap(token, 'capture_size_limit', length); return; }
   if (owned.size >= config.limits.queue_depth || queuedBytes + length > config.limits.pending_bytes) {
     losses.queue_overflow++; gap(token, 'owned_byte_queue_full', length); return;
   }
-  const sha256 = Checksum.compute('sha256', bytes);
   const elapsed = Date.now() - start;
   losses.capture_time_ms += elapsed;
   losses.max_capture_time_ms=Math.max(losses.max_capture_time_ms||0,elapsed);
   if (elapsed > config.limits.capture_ms) { gap(token, 'copy_time_budget_exceeded', length); return; }
   const transfer = 'transfer-' + (++serial);
-  const entry = {bytes, time: Date.now(), size: length};
+  if(2+Math.ceil(length/262144)>config.limits.queue_depth){gap(token,'transfer_exceeds_event_ring_capacity',length);return;}
+  const entry = {bytes, time: Date.now(), size: length,trace_key:traceKey,
+    begin:Object.assign({transfer, token: token.name, pack: config.id,
+      size:length,sha256,logical_id:transfer,consistency:'single_copy_not_atomic',
+      thread_id:captureThread,agent_time_ms:observedTime,capture_processing_ms:elapsed,
+      profile:'public-java-buffer-v1',limitations:['No ART backing-memory association established']},metadata)};
   owned.set(transfer, entry); queuedBytes += length;
+  if(traceKey)tracePending.set(traceKey,transfer);
   // The owned ArrayBuffer is populated before returning from the hook. No target
   // pointer or application ByteBuffer is deferred into the transfer queue.
-  setImmediate(() => {
-    if (!owned.has(transfer) || stopped) return;
-    if(eventRing.length+2+Math.ceil(length/262144)>config.limits.queue_depth){
-      owned.delete(transfer);queuedBytes-=length;gap(token,'transfer_event_ring_capacity',length);return;
-    }
-    event('capture.begin', Object.assign({transfer, token: token.name, pack: config.id,
-      size: length, sha256, logical_id: transfer, consistency: 'single_copy_not_atomic',
-      thread_id:captureThread,agent_time_ms:observedTime,capture_processing_ms:elapsed,
-      profile: 'public-java-buffer-v1', limitations: ['No ART backing-memory association established']}, metadata));
-    for (let offset = 0; offset < length; offset += 262144) {
-      event('transfer.chunk', {transfer, offset}, bytes.slice(offset, Math.min(length, offset + 262144)));
-    }
-    event('capture.end', {transfer});
-  });
+  transferQueue.push(transfer);scheduleTransfers();
 }
 function withGuard(fn) {
   const tid = Process.getCurrentThreadId();
@@ -466,7 +502,7 @@ if (nativeToken) {
   runtimeDebug.mark('native.module_observer.installed');
 }
 rpc.exports = {
-  acknowledge(transfer) { const entry = owned.get(transfer); if (entry) {queuedBytes -= entry.size; owned.delete(transfer);} },
+  acknowledge(transfer) { acknowledgeOwned(transfer); },
   stats() { return Object.assign({pending_transfers: owned.size, pending_bytes: queuedBytes}, losses); },
   snapshot(id) { return snapshotRegion(id,'manual'); },
   regions() { return Array.from(regions, ([id,r]) => ({id,base:r.base.toString(),size:r.size})); },
@@ -479,9 +515,9 @@ rpc.exports = {
     for (const hook of triggerHooks.values()) hook.detach();
     if (observer) observer.detach();
     if (triggerObserver) triggerObserver.detach();
-    while(eventRing.length)flushEvents();
+    while(eventRing.length||transferQueue.length){flushEvents();flushTransfers();}
     stopped = true;
-    owned.clear(); queuedBytes = 0;
+    owned.clear();transferQueue.length=0;tracePending.clear();traceRetained.clear();queuedBytes = 0;
     runtimeDebug.stop();
     return losses;
   }
@@ -489,7 +525,7 @@ rpc.exports = {
 setInterval(() => {
   for (const [id, entry] of owned) {
     if (Date.now() - entry.time > config.limits.transfer_seconds * 1000) {
-      owned.delete(id); queuedBytes -= entry.size;
+      acknowledgeOwned(id);
       losses.dropped_bytes += entry.size;
       event('coverage.gap', {reason: 'transfer_ack_timeout', transfer: id, bytes: entry.size});
     }

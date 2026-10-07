@@ -83,23 +83,23 @@
         "tracked_objects": 512,
         "object_time_ms": 20,
         "classes": [
-          "v80",
-          "a90",
-          "p50",
-          "rv",
-          "wk",
-          "al",
-          "zk",
-          "yk",
-          "xk",
-          "qh",
-          "yb0$a",
+          "fd0",
+          "kd0",
+          "s90",
+          "jz",
+          "in",
+          "mn",
+          "ln",
+          "kn",
+          "jn",
+          "ij",
+          "qh0$a",
           "lab.runtimecode.flow.EntryActivity",
           "lab.runtimecode.flow.RelayActivity",
           "lab.runtimecode.flow.BrowserActivity",
-          "z8"
+          "u9"
         ],
-        "apk_sha256": "523dca0240ce2faa6cf416fa2655a6a9502d255614a44fcaad6d6a26a44813db"
+        "apk_sha256": "6271e3c976ce5ff33aad95ae55a9b4d9c3e2f810deadf39c809612eccbbd49f0"
       },
       "handlers": []
     },
@@ -119,7 +119,7 @@
       "selection": {
         "methods": [
           {
-            "class": "qb0",
+            "class": "gg0",
             "method": "a"
           }
         ]

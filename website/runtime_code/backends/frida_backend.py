@@ -106,6 +106,58 @@ def select_profile(candidates,device_info,binary,tokens):
     return matches[0]
 
 
+def select_server_binary(serial,version,abi,server_dir):
+    """Use a host binary or an already installed Android server, regardless of name."""
+    filename=f'frida-server-{version}-android-{abi}'
+    local=next((path for path in (server_dir/filename,server_dir/'frida-server') if path.is_file()),None)
+    if local:
+        remote=f'/data/local/tmp/runtime-code-fsd-{version}'
+        expected=hashlib.sha256(local.read_bytes()).hexdigest()
+        try:actual=adb(serial,'shell','sha256sum',remote).split()[0]
+        except subprocess.CalledProcessError:actual=None
+        if actual!=expected:
+            adb(serial,'push',str(local),remote);adb(serial,'shell','chmod','755',remote)
+        reported=adb(serial,'shell',remote,'--version')
+        if reported!=version:
+            raise RuntimeError(f'Frida server {local} reports {reported!r}, expected {version}; check paths.server_dir before launch')
+        return remote,expected,'matching_host_binary'
+    # No host copy is required if a version-matched server is installed already.
+    candidates=['/data/local/tmp/frida-server','/data/local/tmp/'+filename,f'/data/local/tmp/runtime-code-fsd-{version}']
+    try:
+        installed=adb(serial,'shell','command -v frida-server')
+        if re.fullmatch(r'/[A-Za-z0-9_./+\-]+',installed):candidates.append(installed)
+    except subprocess.CalledProcessError:pass
+    failures=[]
+    for remote in dict.fromkeys(candidates):
+        try:
+            actual=adb(serial,'shell','sha256sum',remote).split()[0]
+            if not re.fullmatch(r'[0-9a-fA-F]{64}',actual):raise ValueError('No valid executable SHA-256')
+            reported=adb(serial,'shell',remote,'--version')
+            if reported==version:return remote,actual.lower(),'installed_device_binary'
+            failures.append(f'{remote} reports {reported!r}')
+        except (subprocess.CalledProcessError,ValueError,IndexError):continue
+    detail='; '+ '; '.join(failures) if failures else ''
+    raise ValueError(f'No matching Android Frida {version} server: place {filename} or frida-server in {server_dir}, or install it as /data/local/tmp/frida-server on the selected device{detail}')
+
+
+def detachment_details(reason,crash=None):
+    """Keep Frida's supplied crash evidence bounded and JSON serializable."""
+    details={'reason':str(reason)[:512],'crash':None}
+    if crash is not None:
+        evidence={}
+        for name,limit in (('process_name',512),('summary',4096),('report',65536)):
+            try:value=getattr(crash,name,None)
+            except Exception:continue
+            if value is not None:
+                text=str(value);evidence[name]=text[:limit]
+                if len(text)>limit:evidence[name+'_truncated']=True
+        try:
+            if type(crash.pid) is int:evidence['pid']=crash.pid
+        except Exception:pass
+        details['crash']=evidence
+    return details
+
+
 class FridaBackend:
     def __init__(self):
         self.sessions={}
@@ -122,7 +174,10 @@ class FridaBackend:
         self.forward_port=None
         self.remote_endpoint=None
         self.companions=[]
+        self.script_hook_limit=128
         self.debug=False
+        self.logcat=None
+        self.server_identity=None
 
     def configure_scripts(self,paths):
         if len(paths)>8:raise ValueError('--script accepts at most 8 files')
@@ -143,7 +198,11 @@ class FridaBackend:
             with frida_deadline('Loading companion '+spec['name'],get_config()['timeouts']['script_load']):
                 # Each create_script has separate globals and RPC exports. Do not
                 # concatenate analyst source with the collector or rewrite it.
-                script=session.create_script(self.java_bridge_source(isolated=True)+'\n'+spec['source'],name='companion-'+str(index)+'-'+spec['name'])
+                compatibility=Path(__file__).with_name('frida_companion.js').read_text().replace('__HOOK_LIMIT__',str(self.script_hook_limit))
+                # Initialize the bridge before the analyst's native-hook quota can
+                # be exhausted; bridge support hooks are not analyst registrations.
+                warmup='if(Java.available)Java.performNow(function(){});'
+                script=session.create_script(self.java_bridge_source(isolated=True)+'\n'+warmup+'\n'+compatibility+'\n'+spec['source'],name='companion-'+str(index)+'-'+spec['name'])
                 item['companions'].append(script)
                 stats={**metadata,'emitted':0,'dropped':0,'binary_bytes_not_retained':0}
                 item['companion_stats'].append(stats)
@@ -170,8 +229,8 @@ class FridaBackend:
                 script.on('message',on_message)
                 script.load()
             self.service.submit(process,{'kind':'coverage.companion','data':{**metadata,'state':'loaded','globals':'isolated_script_context',
-                'order':'after_collector_script_load','startup_events_may_be_missed':True,
-                'limitations':['Hooking the same target method may still conflict','Script load does not establish asynchronous hook readiness','Messages are bounded previews; binary output is not retained']}})
+                'order':'after_collector_ready','native_hook_limit':self.script_hook_limit,'legacy_module_lookups':'Process-based adapter','startup_events_may_be_missed':True,
+                'limitations':['Hooking the same target method may still conflict','Java hooks and callback CPU cost are not automatically bounded','Messages are bounded previews; binary output is not retained']}})
 
     def report_companions(self,item,process):
         if item.get('companion_stats_reported'):return
@@ -195,7 +254,7 @@ class FridaBackend:
         result=adb(None,'devices',stage='Listing connected Android devices')
         return [line.split()[0] for line in result.splitlines()[1:] if len(line.split())>=2 and line.split()[1]=='device']
 
-    def prepare_watch(self,serial,app):
+    def prepare_watch(self,serial,app,launch=True):
         """Prepare the matching server, launch Android Activity, then attach."""
         import frida
         settings=get_config();version=settings['frida']['version']
@@ -203,6 +262,7 @@ class FridaBackend:
             raise RuntimeError(f"Configured Frida {version} but this Python has {frida.__version__}; install the matching host package or edit frida.version in runtime-code.local.json")
         host_compatibility(version)
         if not re.fullmatch(r'[A-Za-z0-9_.]+',app):raise ValueError('Invalid package identifier')
+        self.serial,self.app=serial,app
         info=preflight(serial,require_root=False)
         if not info['root'] and serial.startswith('emulator-'):
             adb(serial,'root')
@@ -213,18 +273,8 @@ class FridaBackend:
         if not abi:raise ValueError('Live server binary unavailable for '+info['abi'])
         bundled=Path(__file__).resolve().parents[2]/'vendor/frida-server'
         server_dir=Path(os.environ['RUNTIME_CODE_SERVER_DIR']).expanduser() if os.environ.get('RUNTIME_CODE_SERVER_DIR') else bundled if bundled.is_dir() and not config_source() else Path(settings['paths']['server_dir']).expanduser()
-        local=server_dir/f'frida-server-{version}-android-{abi}'
-        if not local.is_file():raise ValueError('Missing verified matching server binary: '+str(local))
         self.server_port=self.server_port or settings['frida']['server_port']
-        remote=f'/data/local/tmp/runtime-code-fsd-{version}'
-        expected=hashlib.sha256(local.read_bytes()).hexdigest()
-        try:actual=adb(serial,'shell','sha256sum',remote).split()[0]
-        except subprocess.CalledProcessError:actual=None
-        if actual!=expected:
-            adb(serial,'push',str(local),remote);adb(serial,'shell','chmod','755',remote)
-        actual_version=adb(serial,'shell',remote,'--version')
-        if actual_version!=version:
-            raise RuntimeError(f'Frida server reports {actual_version!r}, expected {version}; check paths.server_dir before launch')
+        remote,expected,basis=select_server_binary(serial,version,abi,server_dir)
         # Reuse a matching live endpoint; report conflicts rather than kill another server.
         probe_port=adb(serial,'forward','tcp:0',f'tcp:{self.server_port}')
         endpoint='127.0.0.1:'+probe_port;manager=frida.get_device_manager()
@@ -254,8 +304,13 @@ class FridaBackend:
         owners=[int(pid) for line in listeners.splitlines() if re.search(rf':{self.server_port}\s',line) for pid in re.findall(r'pid=(\d+)',line)]
         if len(set(owners))!=1 or adb(serial,'shell','sha256sum',f'/proc/{owners[0]}/exe').split()[0]!=expected:
             raise RuntimeError(f'Cannot verify that device port {self.server_port} belongs to the matching {version} server binary')
+        self.server_identity={'path':remote,'sha256':expected,'reported_version':version,'selection_basis':basis,'listener_pid':owners[0],'port':self.server_port}
+        if diagnostics._active:diagnostics._active.record('frida.server',**self.server_identity)
         # Launching through Android avoids unsupported zygote spawn profiles and is
         # explicitly recorded as late attachment by start().
+        return launch_app(serial,app) if launch else None
+
+    def launch_watch(self,serial,app):
         return launch_app(serial,app)
 
     def capabilities(self):
@@ -296,7 +351,7 @@ class FridaBackend:
                 if overlap:raise ValueError(f'{left.name}, {right.name}: overlapping method hooks {sorted(overlap)}; select each method in one scoped token')
         jni=json.loads(Path(__file__).with_name('jni_table.json').read_text())['functions']
         source=(Path(__file__).with_name('frida_agent.js')).read_text().replace('__CONFIG__',json.dumps({**pack.json(),'art_profile':profile,'linker_profile':linker_profile,'jni_table':jni}))
-        source=source.replace('// TRACE_EXTENSION',Path(__file__).with_name('frida_flows.js').read_text()+'\n'+Path(__file__).with_name('frida_object_flow.js').read_text())
+        source=source.replace('// TRACE_EXTENSION','\n'.join(Path(__file__).with_name(name).read_text() for name in ('frida_flows.js','frida_object_flow.js','frida_custom_tabs.js')))
         if any(t.capability in ('dex.input.java','jni.trace.selected','webview.platform','network.platform','parser.json','parser.custom','crypto.cipher','crypto.custom','reflection.java','flow.java') for t in pack.tokens):
             source='runtimeDebug.mark("java.bridge.begin");\n'+self.java_bridge_source()+'runtimeDebug.mark("java.bridge.loaded");\n'+source
         debug_source=Path(__file__).with_name('frida_diagnostics.js').read_text() if self.debug else 'const runtimeDebug={mark(){},ready(){},enter(){},leave(){},stop(){}};\n'
@@ -376,6 +431,7 @@ class FridaBackend:
         if system.get('access')=='jailed':
             raise RuntimeError('Full Frida server access unavailable. Start the matching rooted frida-server; APK/Gadget modification is not used.')
         device_info['host_configuration']={'source':config_source(),'timeouts':dict(get_config()['timeouts']),'configured_frida':dict(get_config()['frida'])}
+        if self.server_identity:device_info['server_identity']=dict(self.server_identity)
         if diagnostics._active:
             diagnostics._active.record('device.configuration', device=device_info, frida=frida.__version__, pack=pack.id)
         device_info['frida']=frida.__version__
@@ -399,6 +455,13 @@ class FridaBackend:
             if spawned:
                 with diagnostics.phase('Resuming spawned app'):self.device.resume(pid)
         self.poller=threading.Thread(target=self.poll,daemon=True);self.poller.start()
+        try:
+            from ..logcat import LogcatCapture
+            def pids():
+                with self.lock:return {item['pid'] for item in self.sessions.values()}
+            self.logcat=LogcatCapture(get_config()['paths']['adb'],serial,service.store.root,service.run,app,pids).start()
+        except Exception as error:
+            service.store.observe(service.run,None,'coverage.logcat',{'state':'unavailable','reason':str(error)})
 
     def attach(self,pid,name,mode):
         with self.lock:
@@ -415,24 +478,31 @@ class FridaBackend:
             with frida_deadline('Creating instrumentation script'):
                 script=session.create_script(self.code)
             self.sessions[process]={'pid':pid,'session':session,'script':script}
+            ready=threading.Event()
             def message(message,data):
                 if message.get('type')=='send':
                     payload=message['payload']
                     if isinstance(payload,dict) and 'runtime_diagnostic' in payload:
                         diagnostics.target(pid,payload['runtime_diagnostic'])
-                    else:self.service.submit(process,payload,data)
+                    else:
+                        if isinstance(payload,dict) and payload.get('kind')=='instrumentation.ready':ready.set()
+                        self.service.submit(process,payload,data)
                 elif message.get('type')=='error':
                     diagnostics.target(pid,{'kind':'error','error':message.get('stack',message.get('description',str(message)))})
                     self.service.submit(process,{'kind':'instrumentation.failure','data':message})
             script.on('message',message)
-            def detached(reason,*args):
-                diagnostics.target(pid,{'kind':'detached','error':reason})
-                self.service.submit(process,{'kind':'lifecycle.detached','data':{'reason':reason}})
+            def detached(reason,crash=None,*args):
+                details=detachment_details(reason,crash)
+                diagnostics.target(pid,{'kind':'detached','error':details['reason'],'crash':details['crash']})
+                self.service.submit(process,{'kind':'lifecycle.detached','data':details})
                 with self.lock:
                     item=self.sessions.pop(process,None)
                     if item:self.report_companions(item,process)
             session.on('detached',detached)
             with frida_deadline('Loading instrumentation script',get_config()['timeouts']['script_load']):script.load()
+            if self.companions:
+                with diagnostics.phase('Waiting for collector readiness before companion hooks'):
+                    if not ready.wait(get_config()['timeouts']['script_load']):raise TimeoutError('Collector did not become ready; companion hooks were not loaded')
             self.load_companions(session,self.sessions[process],process)
 
     def poll(self):
@@ -445,10 +515,12 @@ class FridaBackend:
                 self.service.submit(None,{'kind':'coverage.gap','data':{'reason':'process_inventory_failed','error':str(error)}})
                 self.poll_stop.wait(3)
 
-    def acknowledge(self,process,transfer):
+    def acknowledge(self,process,transfer,verified=False):
         with self.lock:item=self.sessions.get(process)
         if item:
-            self.bounded_rpc(item,'acknowledge',transfer)
+            # Persistence must not wait for a round-trip RPC for every tiny value.
+            # The collector receives this only after verified host publication.
+            item['script'].post({'type':'runtime.acknowledge','payload':{'transfer':transfer,'verified':verified}})
 
     def static_input_files(self,directory):
         """Copy package-manager code paths for core static indexing; never patch APKs."""
@@ -492,6 +564,7 @@ class FridaBackend:
     @diagnostics.operation('Stopping instrumentation and detaching')
     def stop(self):
         import frida
+        if self.logcat:self.logcat.close();self.logcat=None
         self.poll_stop.set()
         if self.poller:self.poller.join(timeout=3)
         with self.lock:items=list(self.sessions.items())

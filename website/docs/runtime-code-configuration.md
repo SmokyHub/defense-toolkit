@@ -76,6 +76,7 @@ It does not start an emulator: start your chosen AVD in Android Studio first.
 
 - `paths.adb`: executable name on PATH, or a full/relative path (spaces are supported).
 - `paths.server_dir`: directory holding uncompressed Android Frida server executables.
+  A matching server already installed on Android can also be used without a host copy.
 - `paths.analysis_python`: optional interpreter with Androguard for static indexing. Empty
   uses the existing `.venvs/analysis/bin/python`, then the lab's `~/tools/venv/bin/python`.
 - `paths.store`: managed SQLite/artifact directory; `--store` overrides it.
@@ -120,10 +121,22 @@ and macOS portability paths use regression simulations, not a live M4 validation
 Changing `frida.version` does not install or download anything. Install that exact Frida
 Python package in the runtime interpreter with compatible `frida-tools`, and provide
 `frida-server-VERSION-android-arm64` or `frida-server-VERSION-android-x86_64` in
-`paths.server_dir`. The adapter chooses the **Android device ABI**, not the Mac CPU ABI.
+`paths.server_dir`. A plain `frida-server` filename in that directory is also accepted;
+the version/ABI-specific host filename takes precedence when both exist.
+The adapter chooses the **Android device ABI**, not the Mac CPU ABI.
 It checks the installed host version, the server's reported version and the running server's
 binary hash. `watch` uses the configured port; `capture --config ...` uses it too and expects
 the matching rooted server to be running already.
+
+When neither host filename exists, `watch` looks for a matching server already installed
+as `/data/local/tmp/frida-server`, the version/ABI-specific name in `/data/local/tmp`,
+the managed `/data/local/tmp/runtime-code-fsd-VERSION`, or `frida-server` on Android's
+`PATH`. A generic device filename needs no configuration change. Its `--version` must
+match `frida.version` exactly, and the listener's `/proc/PID/exe` hash must match the
+selected binary before the app launches. An installed binary's matching version does
+not establish an upstream/stock build; the selected binary hash and selection basis
+are recorded in Coverage. The configured port is respected, and conflicting listeners
+are left running. Renaming a server does not change its compatibility.
 
 `watch` foregrounds the Activity without `am start -W`: it waits for an app PID, not the first
 screen draw. Splash/network delays therefore do not consume the old 15-second draw wait.
@@ -170,6 +183,18 @@ After ten seconds without the expected progress, it distinguishes:
 - `ANDROID_MAIN_THREAD_STALLED`: JavaScript heartbeats continue, but the scheduled main-thread
   callback has not returned. Only one callback can be outstanding at a time.
 - `AGENT_ERROR`: an instrumentation error was delivered; its stack is retained locally.
+- `TARGET_DISCONNECTED`: no attached target remains. The warning and target table show each
+  recorded PID and detach reason. `process-terminated` records process exit;
+  `connection-terminated` records transport loss. Neither reason alone explains its cause.
+
+When Frida supplies crash details on detachment, the debug page keeps the summary and an
+expandable report, and the saved Run keeps the same evidence in `lifecycle.detached`.
+Reports are capped at 65,536 characters with truncation marked. If Frida supplies no crash
+details, the page says so; inspect the saved Logcat with **App only** disabled because Android
+crash/ANR messages may come from system processes. Search for the affected PID, `AndroidRuntime`,
+`Fatal signal`, or `ANR`. `collector.source.loaded` means the collector's top-level source finished
+loading; it does not identify the WebView call or prove a deadlock at that line. A restart can
+restore collection but leaves a gap in evidence from the previous attachment.
 
 Heartbeats include bounded names of active Java flow/DEX callbacks, with no argument values.
 Host stack dumps contain Python stack locations, not Android native thread stacks. Last-seen
@@ -181,3 +206,12 @@ only after Java hooks are ready; inventory-only packs do not initialize a Java b
 Automated validation covers a blocked host call, missing agent heartbeat, an unanswered main-thread
 probe, retained reports, bounded diagnostic callbacks, bootstrap ordering and JavaScript syntax.
 This does not establish live Android 16 ARM/macOS compatibility or resolve an unobserved freeze.
+
+
+`run` aliases `watch`. Neither needs a pack by default: installed DEX files are indexed
+sequentially before launch, then bounded method/decoder scopes are selected automatically.
+Startup progress reports the indexing stage. `--preanalysis-seconds` controls the total worker
+budget; `--no-static` opts out. `--script /path/hooks.js` selects a reduced collector profile
+when no explicit pack is supplied. `--script-hook-limit` controls its companion's native hook
+quota; Java hook cost remains the script author's responsibility. Existing local settings
+need no edits for these features. See [automatic discovery](runtime-code-live.md#automatic-discovery-and-companion-budgets).

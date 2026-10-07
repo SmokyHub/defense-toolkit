@@ -98,13 +98,16 @@ function commitObjectBoundary(context,identities){
 function instrumentObjectMethod(token,name,method){
  flowHook(token,name,method,{kind:'flow.call',
   before(args,ctx){
-   ctx.data_links=[];ctx.method_kind=method==='$init'?'constructor':'method';
+   ctx.data_links=[];ctx.method_kind=method==='$init'?'constructor':'method';ctx.parameters=[];
+   for(let i=0;i<Math.min(args.length,8);i++)ctx.parameters.push(observedValue(token,args[i],ctx.signature[i],ctx));
+   ctx.input=ctx.parameters.find(p=>p.sha256)||{status:'absent',reason:'No retained String, byte[] or ByteBuffer argument'};
    const values=args.map((arg,i)=>['argument['+i+']',arg]);
    if(method!=='$init'&&this.$h)values.unshift(['receiver',this]);
    objectBoundary(token,values,ctx,'objects_before');
    ctx.field_observation='Snapshots at method boundaries; no claim of individual field reads/writes';ctx.field_consistency='sequential_field_reads_not_atomic';
   },
   after(args,result,ctx){
+   ctx.output=observedValue(token,result,ctx.return_type,ctx);
    const values=[['return',result]];if(this.$h)values.push(['receiver',this]);
    const identities=objectBoundary(token,values,ctx,'objects_after');commitObjectBoundary(ctx,identities);ctx.outcome='returned';
   },
@@ -125,7 +128,7 @@ function discoverObjectFlow(frames){
  const token=tokens.get('flow.java');if(!token||!token.selection.discover_from_stacks||!objectHelpers)return;
  for(const frame of frames){
   const name=frame.class||'',origin=frame.origin||'',method=frame.method==='<init>'?'$init':frame.method,key=name+'.'+method;
-  if(!method||!origin.startsWith('/data/')||objectPlatform(name)||objectDiscoveredMethods.has(key)||objectDiscoveredMethods.size>=64)continue;
+  if(!method||!origin.startsWith('/data/')||objectPlatform(name)||!selected(token,name)||objectDiscoveredMethods.has(key)||objectDiscoveredMethods.size>=64)continue;
   objectDiscoveredMethods.add(key);
   event('flow.candidate',{id:'candidate-'+(++serial),token:token.name,class:name,method,origin,
    reason:'observed_stack_candidate_only',trace_enabled:false,

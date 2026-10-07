@@ -5,7 +5,7 @@ const runtimeDebug = (() => {
   function emit(data) { if (!stopped) { try { send({runtime_diagnostic: data}); } catch (_) {} } }
   function mark(stage) { emit({kind: 'checkpoint', stage}); }
   const timer = setInterval(() => {
-    emit({kind: 'heartbeat', main_pending_ms: mainPending ? Date.now() - mainPending : 0,
+    emit({kind: 'heartbeat', ready, main_pending_ms: mainPending ? Date.now() - mainPending : 0,
       main_probe: mainProbe, active_hooks: Array.from(active.values()).slice(0, 16)});
     if (ready && mainProbe === 'enabled' && !mainPending) {
       mainPending = Date.now();

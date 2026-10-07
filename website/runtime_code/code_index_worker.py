@@ -17,6 +17,7 @@ def argument_evidence(value):
 def identity(owner,name,desc):return owner+'->'+name+desc.replace(' ','')
 def java_name(owner):return (owner[1:-1] if owner.startswith('L') and owner.endswith(';') else owner).replace('/','.')
 def category(target):
+    if target.startswith('Ljava/lang/String;-><init>([B'):return 'byte_string_conversion'
     if '->loadUrl(' in target or '->loadData' in target:return 'webview_navigation'
     if '->setWebViewClient(' in target or 'WebViewClient;' in target:return 'webview_client'
     if 'customtabs/' in target or '->launchUrl(' in target:return 'custom_tab'
@@ -60,6 +61,8 @@ class Index:
                 extra=ins.get_data() if name=='fill-array-data-payload' else None
                 width=getattr(ins,'element_width',None)
                 instructions[pc]=(name,ops,ins.get_length(),extra,width)
+                if name.startswith('if-'):
+                    self.site(key,pc,'conditional_gate',opcode=name,basis='static_conditional_branch',execution='not_established')
                 if name.startswith('invoke'):
                     target=str(ops[-1][-1]).replace(' ','')
                     self.edges.append({'from':key,'to':target,'offset':pc,'basis':'static_invoke_reference','dispatch':name,'category':category(target)})
@@ -75,6 +78,22 @@ class Index:
             xor=any(n.startswith('xor-') for n,_,_,_,_ in instructions.values())
             self.methods[key]={'registers':code.get_registers_size(),'incoming':code.get_ins_size(),'static':bool(method.get_access_flags()&8),'code':instructions,'xor':xor}
             if xor:self.site(key,0,'xor_candidate',basis='heuristic_xor_instruction',reason='XOR alone does not establish string decoding or encryption')
+        if len(self.edges)>200000:raise Unsupported('Reference count budget exceeded')
+        # A Runnable/Function callback can be constructed here and invoked later
+        # by a framework. Preserve this as a possible callback, never an invoke.
+        callbacks={}
+        for cls in self.classes:
+            if any(i=='Ljava/lang/Runnable;' or i.startswith('Lkotlin/jvm/functions/Function') for i in cls['interfaces']):
+                callbacks[cls['descriptor']]=[]
+        for key in self.methods:
+            owner,name=key.split('->',1)
+            if owner in callbacks and (name.startswith('run(') or name.startswith('invoke(')):
+                callbacks[owner].append(key)
+        for site in self.sites:
+            if site['kind']=='instantiation':
+                for target in callbacks.get(site['target'],[])[:4]:
+                    self.edges.append({'from':site['method'],'to':target,'offset':site['offset'],
+                        'basis':'static_callback_candidate','category':'possible_callback','execution':'not_established'})
         if len(self.edges)>200000:raise Unsupported('Reference count budget exceeded')
         # Evaluate each method independently with unknown arguments. Only deterministic,
         # modeled prefixes/paths produce values; unknown branches stop interpretation.

@@ -53,6 +53,11 @@ def target(pid, payload):
             monitor.inbox.put_nowait((pid, payload))
         except queue.Full:
             monitor.dropped += 1
+            if isinstance(payload,dict) and payload.get('kind') in ('heartbeat','ready','detached','error','stopped'):
+                # Drop an old checkpoint so lifecycle/heartbeat state survives a
+                # large hook-install burst. Never block the Frida callback.
+                try:monitor.inbox.get_nowait();monitor.inbox.put_nowait((pid,payload))
+                except (queue.Empty,queue.Full):pass
 
 
 class Diagnostics:
@@ -101,8 +106,12 @@ class Diagnostics:
             self.history.append(row)
             self.stream.write(json.dumps(row) + '\n')
             self.stream.flush()
-            if kind in ('host.begin', 'target.checkpoint', 'target.error', 'watchdog.warning'):
+            if kind in ('host.begin', 'target.checkpoint', 'target.error', 'target.detached', 'watchdog.warning'):
                 label = data.get('stage') or data.get('summary') or data.get('error', '')
+                if kind == 'target.detached':
+                    label = f'PID {data["pid"]}: {label}'
+                    if (data.get('crash') or {}).get('summary'):
+                        label += '; crash: ' + data['crash']['summary'][:512]
                 print(f'[debug] {kind}: {label}', file=sys.stderr, flush=True)
             if kind in ('host.error', 'target.error'):
                 self.failure = data
@@ -140,6 +149,7 @@ class Diagnostics:
                     self.record('target.checkpoint', pid=pid, stage=state['checkpoint'])
                 elif kind == 'heartbeat':
                     state['heartbeat'] = now
+                    if data.get('ready') is True:state['ready']=True
                     state['main_pending_ms'] = data.get('main_pending_ms', 0)
                     state['main_probe'] = data.get('main_probe', 'disabled')
                     state['active_hooks'] = data.get('active_hooks', [])
@@ -149,7 +159,11 @@ class Diagnostics:
                     self.record('target.ready', pid=pid)
                 elif kind in ('error', 'detached', 'stopped'):
                     state[kind] = str(data.get('error', kind))[:4096]
-                    self.record('target.' + kind, pid=pid, error=state[kind])
+                    extra = {}
+                    if kind == 'detached':
+                        state['crash'] = data.get('crash') or {}
+                        extra['crash'] = state['crash']
+                    self.record('target.' + kind, pid=pid, error=state[kind], **extra)
 
     def assess(self, now=None):
         now = time.monotonic() if now is None else now
@@ -176,7 +190,14 @@ class Diagnostics:
                 return 'ERROR_RECORDED', 'An error was recorded; inspect the last checkpoints below.'
             if self.targets and all(v.get('detached') or v.get('stopped') for v in self.targets.values()):
                 if any(not v.get('stopped') for v in self.targets.values()):
-                    return 'TARGET_DISCONNECTED', 'No instrumented target remains connected. Check the recorded detach reason; process termination and transport loss are possible.'
+                    reasons = []
+                    for pid, state in list(self.targets.items())[:8]:
+                        if state.get('detached'):
+                            detail = f'PID {pid}: {state["detached"][:512]}'
+                            if state.get('crash', {}).get('summary'):
+                                detail += '; crash: ' + state['crash']['summary'][:512]
+                            reasons.append(detail)
+                    return 'TARGET_DISCONNECTED', 'No instrumented target remains connected. ' + ' | '.join(reasons)
                 return 'STOPPED', 'The instrumented agents reported shutdown.'
             if self.targets and all(v['ready'] or v.get('detached') or v.get('stopped') for v in self.targets.values()):
                 return 'RESPONDING', 'Instrumentation checkpoints are responding. This does not prove that every app thread is healthy.'
@@ -196,17 +217,26 @@ class Diagnostics:
                 'AGENT_HEARTBEAT_MISSING': 'The agent event loop or transport stopped responding. Check active_hooks in the last heartbeat and the host stages. Missing heartbeats alone do not prove a deadlock.',
                 'ANDROID_MAIN_THREAD_STALLED': 'The agent event loop is alive, but the scheduled Android main-thread callback has not run. Check active_hooks for callbacks still in flight. Normal long-running main-thread work can also trigger this warning.',
                 'AGENT_ERROR': 'The agent returned an error. Its stack is retained in the checkpoint log and target state.',
-                'TARGET_DISCONNECTED': 'Inspect the target detach reason below. A disconnected target is not evidence of a blocked thread.',
+                'TARGET_DISCONNECTED': 'process-terminated records process exit; connection-terminated records transport loss. Neither reason alone establishes why it happened. Any crash details Frida supplied are shown below; otherwise check the saved Logcat without the App only filter.',
             }.get(code, 'Keep this page open while reproducing the freeze. Diagnostics are opt-in and add timing overhead.')
             now = time.monotonic()
             target_rows = []
+            crash_reports = []
             for pid, state in self.targets.items():
                 heartbeat = f'{now-state["heartbeat"]:.1f}s ago' if 'heartbeat' in state else 'not received'
                 hooks = ', '.join(str(hook.get('hook', '?')) for hook in state.get('active_hooks', [])) or 'none observed'
                 cells = [pid, state.get('java_checkpoint', 'not used or not reached'), state.get('checkpoint', 'none'),
-                         heartbeat, f'{state.get("main_pending_ms", 0)/1000:.1f}s ({state.get("main_probe", "not started")})', hooks]
+                         heartbeat, f'{state.get("main_pending_ms", 0)/1000:.1f}s ({state.get("main_probe", "not started")})', hooks,
+                         state.get('detached', 'connected' if not state.get('stopped') else 'agent stopped'),
+                         state.get('crash', {}).get('summary') or ('not supplied by Frida' if state.get('detached') else 'none received')]
                 target_rows.append('<tr>' + ''.join('<td>'+html.escape(str(value))+'</td>' for value in cells) + '</tr>')
-            target_table = '<table><tr><th>PID</th><th>Last Java checkpoint</th><th>Last overall checkpoint</th><th>Agent heartbeat</th><th>Main-thread probe pending</th><th>Active callbacks</th></tr>' + ''.join(target_rows) + '</table>' if target_rows else '<p>No agent checkpoint has arrived yet. See host operations below.</p>'
+                crash = state.get('crash', {})
+                if crash:
+                    report = crash.get('report') or 'Frida supplied no crash report text.'
+                    if crash.get('report_truncated'):report += '\n[Report truncated to 65,536 characters.]'
+                    crash_reports.append('<details><summary>Frida crash report for PID '+html.escape(pid)+'</summary><pre>'+html.escape(report)+'</pre></details>')
+            target_table = '<table><tr><th>PID</th><th>Last Java checkpoint</th><th>Last overall checkpoint</th><th>Agent heartbeat</th><th>Main-thread probe pending</th><th>Last observed callbacks</th><th>Detach reason</th><th>Crash summary</th></tr>' + ''.join(target_rows) + '</table>' if target_rows else '<p>No agent checkpoint has arrived yet. See host operations below.</p>'
+            target_table += ''.join(crash_reports)
             host_rows = ''.join(f'<li>{html.escape(value["stage"])} — {now-value["since"]:.1f}s</li>' for value in self.phases.values())
             checkpoint_rows = ''.join('<tr><td>'+html.escape(row['time'])+'</td><td>'+html.escape(row['kind'])+'</td><td>'+html.escape(str(row.get('stage') or row.get('summary') or row.get('error', '')))+'</td></tr>' for row in list(self.history)[-25:])
             self._replace('status.json', json.dumps(snapshot, indent=2))

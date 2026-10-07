@@ -34,12 +34,30 @@ class Service:
         if self.target_lease is not None:
             self.target_lease.close();self.target_lease=None
 
-    def start(self, backend, pack, app, device, pid=None):
+    def prepare(self,backend,pack,app,device):
+        """Reserve a saved Run for sequential analysis before target launch."""
+        if self.run is not None:raise ValueError('Service already has a Run')
+        coverage=negotiate(pack,backend.capabilities(),HANDLERS)
+        self.reserve(app,device);self.pack,self.backend=pack,backend
+        backend.service=self
+        self.run=self.store.create_run(app,device,pack,{'requested':coverage,'backend_capabilities':[asdict(c) for c in backend.capabilities()]})
+        self.lease=self.store.lease(self.run);self.store.state('runs',self.run,'preparing')
+        return self.run
+
+    def start(self, backend, pack, app, device, pid=None, prepared_run=None):
         coverage = negotiate(pack, backend.capabilities(), HANDLERS)
         self.reserve(app,device)
         self.pack, self.backend = pack, backend
-        self.run = self.store.create_run(app, device, pack, {'requested':coverage,'backend_capabilities':[asdict(c) for c in backend.capabilities()]})
-        self.lease = self.store.lease(self.run)
+        if prepared_run is None:
+            self.run = self.store.create_run(app, device, pack, {'requested':coverage,'backend_capabilities':[asdict(c) for c in backend.capabilities()]})
+            self.lease = self.store.lease(self.run)
+        else:
+            row=self.store.one('SELECT * FROM runs WHERE id=?',(prepared_run,))
+            if self.run!=prepared_run or row['state']!='preparing' or row['app']!=app or row['device']!=device:
+                raise ValueError('Prepared Run does not match this service/target')
+            with self.store.lock,self.store.db:
+                self.store.db.execute('UPDATE runs SET pack=?,coverage=? WHERE id=?',
+                    (encoded(pack.json()),encoded({'requested':coverage,'backend_capabilities':[asdict(c) for c in backend.capabilities()]}),prepared_run))
         self.queue = queue.Queue(maxsize=pack.limits.queue_depth)
         self.worker = threading.Thread(target=self._consume, daemon=True)
         self.worker.start()
@@ -107,12 +125,12 @@ class Service:
                     self.store.begin(self.run,process,payload,sequence)
                 elif kind=='capture.end':
                     snapshot=self.store.finish(process,payload['transfer'])
-                    try:self.backend.acknowledge(process,payload['transfer'])
+                    row=self.store.one('SELECT * FROM snapshots WHERE id=?',(snapshot,))
+                    try:self.backend.acknowledge(process,payload['transfer'],row['status']=='captured')
                     except Exception as error:
                         self.store.observe(self.run,process,'transfer.ack_unavailable',{'snapshot':snapshot,'reason':str(error),
                                            'integrity':'host publication already verified'})
                     # Analysis is outside the hook; exact snapshot ID is immutable.
-                    row=self.store.one('SELECT * FROM snapshots WHERE id=?',(snapshot,))
                     if row['status']=='captured':
                         self._relate_input(row)
                         token=next(t for t in self.pack.tokens if t.name==row['token'])
@@ -330,13 +348,13 @@ class Service:
             self.store.db.execute('INSERT OR REPLACE INTO workspace_checkpoints VALUES(?,?,?)',(run,sequence,time.time_ns()))
         return {**self.workspace_checkpoint(run),'saved_evidence':'preserved','capture':'continues'}
 
-    def evidence(self,run,observation):
+    def evidence(self,run,observation,depth=8,include='',exclude=''):
         from .evidence import detail
-        return detail(self,run,observation)
+        return detail(self,run,observation,depth,include,exclude)
 
-    def index_code(self,run,path,source=None):
+    def index_code(self,run,path,source=None,deadline=None):
         from .code_index import import_code
-        return import_code(self,run,path,source)
+        return import_code(self,run,path,source,deadline)
 
     def search_code(self,run,query='',include='',exclude=''):
         from .code_index import search
@@ -346,20 +364,37 @@ class Service:
         from .code_index import scope_pack
         return scope_pack(self,run,snapshot,method,decoder)
 
-    def flow_scope(self,run,observation,scope_class=None):
+    def flow_scope(self,run,observation,scope_class=None,depth=5,exclude='',decoder=False):
         """Create reviewable pack data for the next Run; never mutate active hooks."""
         from .model import Pack
         from .evidence import callers,object_paths
+        from .search_filters import patterns,matches
+        if type(depth) is not int or not 1<=depth<=8:raise ValueError('Scope depth must be 1..8')
+        excluded=patterns(exclude,exclusion=True)
         row=self.store.one('SELECT data FROM observations WHERE run_id=? AND id=?',(run,observation))
         data=json.loads(row['data']);frames=callers(data)['app_callers']
         if data.get('request') and data.get('trace_enabled') is False:frames=[data['request']]
+        frames=[f for f in frames if matches(f,(),excluded)]
         raw=json.loads(self.store.one('SELECT pack FROM runs WHERE id=?',(run,))['pack'])
-        token=next((t for t in raw['tokens'] if t['capability']=='flow.java'),None)
+        capability='crypto.custom' if decoder else 'flow.java'
+        if decoder:
+            api=data.get('api','').split('(')[0]
+            if not api or '.' not in api:raise ValueError('No observed method to scope')
+            name,method=api.rsplit('.',1);frames=[{'class':name,'method':method}]
+            if not matches(frames[0],(),excluded):raise ValueError('Selected method is excluded')
+            depth=1
+        token=next((t for t in raw['tokens'] if t['capability']==capability),None)
         if token is None:
             names={t['name'] for t in raw['tokens']};name='selected-app-flow'
             while name in names:name+='x'
-            token={'name':name,'capability':'flow.java','mode':'observe','trigger':'call','selection':{},'handlers':[]};raw['tokens'].append(token)
-        selection=token.setdefault('selection',{});selection['discover_from_stacks']=True
+            token={'name':name,'capability':capability,'mode':'observe','trigger':'call','selection':{},'handlers':[]};raw['tokens'].append(token)
+        selection=token.setdefault('selection',{})
+        if not decoder:selection['discover_from_stacks']=True
+        if excluded:
+            for scoped in raw['tokens']:
+                if scoped['capability'] not in ('network.native','native.inventory','native.input.linker'):
+                    existing=scoped.setdefault('selection',{}).setdefault('exclude_prefixes',[])
+                    existing[:]=list(dict.fromkeys(existing+excluded))
         if scope_class:
             observed={f.get('class') for f in frames}|{v.get('class') for v in object_paths(data)}
             if scope_class not in observed:raise ValueError('Class was not observed in this record')
@@ -371,8 +406,13 @@ class Service:
                 method={'class':frame.get('class'),'method':'$init' if frame.get('method')=='<init>' else frame.get('method')}
                 if method not in methods:methods.append(method)
                 if method not in added:added.append(method)
-                if len(added)==2:break
+                if len(added)==depth:break
             if not added:raise ValueError('No app method was observed; select an attributed event or candidate')
+            if decoder:
+                for scoped in raw['tokens']:
+                    if scoped['capability']=='flow.java':
+                        selected=scoped.get('selection',{});selected['methods']=[m for m in selected.get('methods',[]) if m not in added]
+                        selected['classes']=[c for c in selected.get('classes',[]) if c not in {m['class'] for m in added}]
         raw['id']=raw['id'][:82]+'.selected-flow'
         return Pack.parse(raw).json()
 

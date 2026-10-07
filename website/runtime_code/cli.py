@@ -25,15 +25,18 @@ def main():
     c.add_argument('--app',required=True);c.add_argument('--device');c.add_argument('--pid',type=int)
     c.add_argument('--seconds',type=float,default=30);c.add_argument('--ui-port',type=int)
     c.add_argument('--script',action='append',default=[],help='Additional script file, in an isolated backend context; repeat for multiple files')
-    c=sub.add_parser('watch',help='Live capture, portal and JSONL log until Ctrl+C')
+    c=sub.add_parser('watch',aliases=['run'],help='Pre-analyze installed code, then launch and capture until Ctrl+C')
     c.add_argument('--backend',default='frida');c.add_argument('--device');c.add_argument('--app',required=True)
-    c.add_argument('--pack',default=str(Path(__file__).parent/'packs/live.json'))
+    c.add_argument('--pack',help='Optional explicit scopes; default is automatic boundary/decoder discovery')
     c.add_argument('--port',type=int,default=8765);c.add_argument('--seconds',type=float,default=0)
     c.add_argument('--no-web',action='store_true')
     c.add_argument('--no-open',action='store_true',help='Serve the workspace without opening a browser')
     c.add_argument('--code',action='append',default=[],help='APK/DEX/split ZIP to index for unexecuted code references')
     c.add_argument('--no-static',action='store_true',help='Explicitly skip automatic installed-APK static indexing')
     c.add_argument('--script',action='append',default=[],help='Additional script file, in an isolated backend context; repeat for multiple files')
+    c.add_argument('--script-hook-limit',type=int,default=128,help='Maximum active native Interceptor hooks per companion (default 128); Java hooks are not automatically limited')
+    c.add_argument('--preanalysis-seconds',type=float,default=120,help='Overall sequential static worker budget before launch (default 120s)')
+    c.add_argument('--exclude-packages',default='',help='Skip SDK origins, e.g. com.appsflyer or -pkg:com.appsflyer')
     sub.add_parser('runs')
     c=sub.add_parser('evidence',help='Inspect an observation, its callers, linked flow and retained crypto bytes')
     c.add_argument('--run',required=True);c.add_argument('--observation',required=True)
@@ -61,12 +64,12 @@ def main():
     c=sub.add_parser('recover');c.add_argument('--run',required=True)
     c=sub.add_parser('snapshot');c.add_argument('--run',required=True);c.add_argument('--process',required=True);c.add_argument('--target',required=True)
     c=sub.add_parser('command');c.add_argument('id')
-    for command_parser in sub.choices.values():
+    for command_parser in dict.fromkeys(sub.choices.values()):
         command_parser.add_argument('--config',default=argparse.SUPPRESS,help='Machine-local JSON settings file')
     for name in ('watch','capture'):
         sub.choices[name].add_argument('--debug',action='store_true',help='Live local HTML diagnostic report, startup checkpoints and independent stall watchdog')
     args=parser.parse_args()
-    store=None
+    store=None;service=None
     diagnostic=None
     outcome='finished'
     try:
@@ -76,7 +79,7 @@ def main():
         if args.command=='config':
             print(json.dumps({'source':config_source(),'settings':settings},indent=2));return
         args.store=args.store or settings['paths']['store']
-        if args.command in ('capture','watch'):
+        if args.command in ('capture','watch','run'):
             args.device=args.device or settings['device']['serial'] or None
             if args.command=='capture' and not args.device:raise ValueError('Select --device or configure device.serial')
         registry=discover()
@@ -85,11 +88,12 @@ def main():
             if args.backend not in registry:raise ValueError('Unknown backend')
             print(json.dumps([asdict(c) for c in registry[args.backend]().capabilities()],indent=2));return
         store=Store(args.store);service=Service(store)
-        if args.command in ('capture','watch'):
+        if args.command in ('capture','watch','run'):
             if args.backend not in registry:raise ValueError('Unknown backend')
-            watching=args.command=='watch'
+            watching=args.command in ('watch','run')
             if not 0<=args.seconds<=86400 or (not watching and not args.seconds):raise ValueError('seconds must be in (0, 86400], or 0 for continuous watch')
-            pack=Pack.parse(json.loads(Path(args.pack).read_text()))
+            automatic=watching and not args.pack
+            pack=Pack.parse(json.loads(Path(args.pack or Path(__file__).parent/'packs/live.json').read_text()))
             backend=registry[args.backend]()
             if args.debug:
                 diagnostic=Diagnostics(store.root/'diagnostics',{'app':args.app,'device':args.device,'pack':pack.id,
@@ -100,19 +104,52 @@ def main():
             if args.script:
                 if not hasattr(backend,'configure_scripts'):raise ValueError('Selected backend does not support --script; no scripts or capture started')
                 backend.configure_scripts(args.script)
+                if watching:backend.script_hook_limit=args.script_hook_limit
             if watching:
+                if not 1<=args.preanalysis_seconds<=600:raise ValueError('preanalysis-seconds must be 1..600')
+                if not 1<=args.script_hook_limit<=4096:raise ValueError('script-hook-limit must be 1..4096')
                 print(json.dumps({'startup':'Checking device, server and launcher','app':args.app,'device':args.device}),file=sys.stderr,flush=True)
                 if not hasattr(backend,'prepare_watch'):raise ValueError('Selected backend does not implement live launch preparation')
                 devices=backend.available_devices()
                 if not args.device:
                     if len(devices)!=1:raise ValueError('Select --device; available Android devices: '+', '.join(devices))
                     args.device=devices[0]
-                service.reserve(args.app,args.device)
-                args.pid=backend.prepare_watch(args.device,args.app)
+                prepared=service.prepare(backend,pack,args.app,args.device)
+                backend.prepare_watch(args.device,args.app,launch=False)
+                print(json.dumps({'startup':'Static pre-analysis before launch; one bounded DEX worker at a time','run':prepared,'engine':'Androguard','budget_seconds':args.preanalysis_seconds}),file=sys.stderr,flush=True)
+                deadline=time.monotonic()+args.preanalysis_seconds
+                try:
+                    for path in args.code:
+                        with phase('Pre-launch code indexing'):
+                            print(json.dumps({'static_index':service.index_code(prepared,path,deadline=deadline)}),flush=True)
+                    if not args.no_static and not args.code:
+                        import tempfile
+                        if not hasattr(backend,'static_input_files'):raise ValueError('Backend cannot copy installed code; supply --code')
+                        with tempfile.TemporaryDirectory(prefix='runtime-installed-code-') as directory:
+                            for path,source in backend.static_input_files(directory):
+                                if time.monotonic()>=deadline:raise TimeoutError('Pre-launch static budget exhausted')
+                                with phase('Pre-launch installed APK indexing'):
+                                    print(json.dumps({'static_index':service.index_code(prepared,path,source,deadline)}),flush=True)
+                except Exception as error:
+                    service.store.observe(prepared,None,'coverage.static_index',{'state':'partial_or_failed','reason':str(error),'phase':'before_launch'})
+                    print(json.dumps({'static_index_error':str(error),'startup':'Worker has stopped; continuing with available index and platform hooks'}),file=sys.stderr,flush=True)
+                if automatic:
+                    from .discovery import automatic_pack
+                    pack,plan=automatic_pack(service,prepared,pack,bool(args.script),args.exclude_packages)
+                    service.store.observe(prepared,None,'coverage.discovery',plan)
+                    print(json.dumps({'startup':'Discovery complete; static workers finished','methods':plan['selected_count'],'limited':plan['selection_limited'],'profile':plan['profile']}),file=sys.stderr,flush=True)
+                elif args.exclude_packages:
+                    from .search_filters import patterns
+                    raw=pack.json();excluded=patterns(args.exclude_packages,exclusion=True)
+                    for token in raw['tokens']:
+                        if token['capability']!='native.inventory':token.setdefault('selection',{}).setdefault('exclude_prefixes',[]).extend(excluded)
+                    pack=Pack.parse(raw)
+                print(json.dumps({'startup':'Launching app after pre-analysis','app':args.app}),file=sys.stderr,flush=True)
+                args.pid=backend.launch_watch(args.device,args.app)
                 print(json.dumps({'startup':'Attaching instrumentation','pid':args.pid}),file=sys.stderr,flush=True)
                 args.ui_port=None if args.no_web else args.port
             with phase('Starting capture service'):
-                run=service.start(backend,pack,args.app,args.device,args.pid)
+                run=service.start(backend,pack,args.app,args.device,args.pid,**({'prepared_run':prepared} if watching else {}))
             if diagnostic:diagnostic.record('run.created',run=run)
             print(json.dumps({'run':run,'state':'running'}),flush=True)
             log_path=store.root/(run+'.jsonl');cursor=0
@@ -128,19 +165,6 @@ def main():
                     if watching and not args.no_open:
                         from .web import open_workspace
                         open_workspace(server)
-                try:
-                    for path in getattr(args,'code',[]):
-                        print(json.dumps({'static_index':service.index_code(run,path)}),flush=True)
-                    if watching and not args.no_static and not args.code:
-                        import tempfile
-                        if not hasattr(backend,'static_input_files'):raise ValueError('Selected backend cannot copy installed code; supply --code')
-                        with tempfile.TemporaryDirectory(prefix='runtime-installed-code-') as directory:
-                            for path,source in backend.static_input_files(directory):
-                                with phase('Indexing installed APK'):
-                                    print(json.dumps({'static_index':service.index_code(run,path,source)}),flush=True)
-                except Exception as error:
-                    service.store.observe(run,None,'coverage.static_index',{'state':'partial_or_failed','reason':str(error)})
-                    print(json.dumps({'static_index_error':str(error)}),flush=True)
                 deadline=time.monotonic()+args.seconds if args.seconds else float('inf')
                 log=None;cursor=0
                 if watching:
@@ -213,6 +237,7 @@ def main():
     finally:
         if store:
             with phase('Closing local store'):
-                service.release_target()
+                if service and service.run and not service.stopping.is_set():service.stop('failed' if outcome=='failed' else 'ended')
+                if service:service.release_target()
                 store.close()
         if diagnostic:diagnostic.close(outcome)

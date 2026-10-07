@@ -59,18 +59,20 @@ class TokenSpec:
         for key in ('name', 'capability', 'mode', 'trigger'):
             if not isinstance(getattr(item, key), str) or not re.fullmatch(r'[a-zA-Z0-9_.-]{1,100}', getattr(item, key)):
                 raise ContractError(f'TokenSpec.{key}: invalid identifier')
-        if not isinstance(item.selection, dict) or set(item.selection) - {'exclude_prefixes','functions','module','symbol','methods','capture_keys','classes','discover_from_stacks','max_methods','object_depth','object_fields','object_nodes','tracked_objects','object_time_ms','apk_sha256'}:
+        if not isinstance(item.selection, dict) or set(item.selection) - {'exclude_prefixes','functions','module','symbol','methods','capture_keys','classes','discover_from_stacks','trace_byte_strings','max_methods','object_depth','object_fields','object_nodes','tracked_objects','object_time_ms','apk_sha256','call_rate'}:
             raise ContractError(f'{item.name}: unsupported selection fields')
         if 'apk_sha256' in item.selection and (item.capability!='flow.java' or not isinstance(item.selection['apk_sha256'],str) or not re.fullmatch('[0-9a-f]{64}',item.selection['apk_sha256'])):
             raise ContractError(f'{item.name}: apk_sha256 requires a lowercase SHA-256 on flow.java')
         if 'capture_keys' in item.selection and (item.capability!='crypto.cipher' or type(item.selection['capture_keys']) is not bool):
             raise ContractError(f'{item.name}: capture_keys must be a boolean on crypto.cipher')
-        flow_options={'classes','discover_from_stacks','max_methods','object_depth','object_fields','object_nodes','tracked_objects','object_time_ms'}
+        flow_options={'classes','discover_from_stacks','trace_byte_strings','max_methods','object_depth','object_fields','object_nodes','tracked_objects','object_time_ms','call_rate'}
         if flow_options.intersection(item.selection) and item.capability!='flow.java':
             raise ContractError(f'{item.name}: object-flow options require flow.java')
         if 'discover_from_stacks' in item.selection and type(item.selection['discover_from_stacks']) is not bool:
             raise ContractError(f'{item.name}: discover_from_stacks must be boolean')
-        for key,low,high in [('max_methods',1,128),('object_depth',0,4),('object_fields',1,32),('object_nodes',1,16),('tracked_objects',1,1024),('object_time_ms',1,50)]:
+        if 'trace_byte_strings' in item.selection and type(item.selection['trace_byte_strings']) is not bool:
+            raise ContractError(f'{item.name}: trace_byte_strings must be boolean')
+        for key,low,high in [('max_methods',1,128),('object_depth',0,4),('object_fields',1,32),('object_nodes',1,16),('tracked_objects',1,1024),('object_time_ms',1,50),('call_rate',1,1000)]:
             if key in item.selection and (type(item.selection[key]) is not int or not low<=item.selection[key]<=high):
                 raise ContractError(f'{item.name}: {key} must be {low}..{high}')
         classes=item.selection.get('classes',[])

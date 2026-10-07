@@ -9,11 +9,24 @@ def patterns(value,*,exclusion=False):
     result=[]
     for item in value:
         if not isinstance(item,str):raise ValueError('Package prefix must be text')
-        if exclusion:item=item.removeprefix('-')
+        if exclusion:item=item.removeprefix('-pkg:').removeprefix('-')
+        else:item=item.removeprefix('pkg:')
         prefix=item.removesuffix('.*').rstrip('.')
         if len(prefix)>256 or not re.fullmatch(r'[\w$]+(?:\.[\w$]+)*',prefix):raise ValueError('Use package.name or package.name.*')
         result.append(prefix)
     return result
+
+
+def query_filters(query='',include='',exclude=''):
+    """Extract package operators while preserving the remaining literal search."""
+    if not isinstance(query,str) or len(query)>2048:raise ValueError('Search text must be at most 2048 characters')
+    positive=patterns(include);negative=patterns(exclude,exclusion=True)
+    text=[]
+    for word in query.split():
+        if word.startswith('-pkg:'):negative.extend(patterns(word,exclusion=True))
+        elif word.startswith('pkg:'):positive.extend(patterns(word))
+        else:text.append(word)
+    return ' '.join(text),patterns(list(dict.fromkeys(positive))),patterns(list(dict.fromkeys(negative)))
 
 
 def classes(record):

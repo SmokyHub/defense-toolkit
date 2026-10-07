@@ -38,7 +38,7 @@ def legacy_collectors(app,device,proc=None):
             if value.startswith(name+'='):return value.split('=',1)[1]
     for pid,args in _host_processes(proc):
         if not any(args[i:i+2]==['-m','runtime_code'] for i in range(len(args)-1)):continue
-        if not any(c in args for c in ('watch','capture')):continue
+        if not any(c in args for c in ('watch','capture','run')):continue
         if option(args,'--app')==app and option(args,'--device')==device:matches.append(pid)
     return matches
 

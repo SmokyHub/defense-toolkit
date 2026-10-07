@@ -5,7 +5,7 @@ const webviewClients=new Map(),clientOrigins=new Map();
 const webviewNavigations=new Map();
 function navigationIdentity(value){
  if(typeof objectHelpers!=='undefined'&&objectHelpers){try{return {id:objectIdentity(value,objectDefaults).id,association:'observed_same_object'};}catch(e){}}
- return {id:flowId(value),association:'inferred_identity_hash_only'};
+ try{return {id:String(value.getClass().getName())+':'+Java.use('java.lang.System').identityHashCode(value),association:'inferred_identity_hash_only'};}catch(e){return {id:flowId(value),association:'inferred_identity_hash_only'};}
 }
 function remember(map,key,value){if(map.size>=1024&&!map.has(key))map.delete(map.keys().next().value);map.set(key,value);}
 function flowText(value){
@@ -31,6 +31,23 @@ function textBytes(value){
  const text=String(value);if(text.length>65536)return null;
  return byteArray(Java.use('java.lang.String').$new(text).getBytes('UTF-8'));
 }
+function bufferPosition(value){const base=Java.cast(value,Java.use('java.nio.Buffer'));return base.position.overload().call(base);}
+function bufferRemaining(value){const base=Java.cast(value,Java.use('java.nio.Buffer'));return base.remaining.overload().call(base);}
+function bufferBytes(value,offset,length){
+ const size=Math.min(length,65536,config.limits.capture_bytes);
+ const Type=Java.use('java.nio.ByteBuffer'),typed=Java.cast(value,Type),duplicate=Java.cast(typed.duplicate(),Type);
+ const base=Java.cast(duplicate,Java.use('java.nio.Buffer'));
+ base.position.overload('int').call(base,offset);base.limit.overload('int').call(base,offset+size);
+ const bytes=Java.array('byte',Array(size).fill(0));duplicate.get.overload('[B').call(duplicate,bytes);
+ return javaBytes(bytes,0,size);
+}
+function observedValue(token,value,type,ctx){
+ if(value===null||value===undefined)return {status:'absent',reason:'Null value'};
+ if(type==='java.lang.String'||typeof value==='string')return Object.assign(payload(token,textBytes(value),ctx),{representation:'string'});
+ if(type==='[B')return Object.assign(payload(token,javaBytes(value,0,value.length),ctx,value.length),{representation:'byte_array'});
+ if(type==='java.nio.ByteBuffer')return Object.assign(payload(token,bufferBytes(value,bufferPosition(value),bufferRemaining(value)),ctx,bufferRemaining(value)),{representation:'byte_buffer'});
+ return {status:'unsupported',reason:'Value is not String, byte[] or ByteBuffer',type};
+}
 function payload(token,bytes,context,total,retain=true){
  if(!bytes)return {status:'not_captured',reason:'input_size_limit'};
  const hash=Checksum.compute('sha256',bytes),previous=flowSources.get(hash);
@@ -52,6 +69,21 @@ function payload(token,bytes,context,total,retain=true){
    limitations:['Observed fragment; not necessarily a whole request/response or complete source']},Date.now());
  if(result.truncated){losses.truncated_bytes=(losses.truncated_bytes||0)+total-bytes.byteLength;}
  return result;
+}
+const flowRates=new Map();
+function allowAppCall(token,key){
+ if(token.capability!=='flow.java'||!token.selection.call_rate)return true;
+ const reserve=Math.min(64,Math.floor(config.limits.queue_depth/4));
+ if(eventRing.length+owned.size*3>=config.limits.queue_depth-reserve){
+  losses.app_calls_backpressured=(losses.app_calls_backpressured||0)+1;return false;
+ }
+ const second=Math.floor(Date.now()/1000),previous=flowRates.get(key);
+ const rate=previous&&previous.second===second?previous:{second,count:0};flowRates.set(key,rate);
+ if(++rate.count>token.selection.call_rate){losses.app_calls_rate_limited=(losses.app_calls_rate_limited||0)+1;return false;}
+ const wholeKey=token.name+':total',wholePrevious=flowRates.get(wholeKey);
+ const whole=wholePrevious&&wholePrevious.second===second?wholePrevious:{second,count:0};flowRates.set(wholeKey,whole);
+ if(++whole.count>token.selection.call_rate*2){losses.app_calls_global_limited=(losses.app_calls_global_limited||0)+1;return false;}
+ return true;
 }
 function flowHook(token,name,method,handlers){
  runtimeDebug.mark('java.hook.resolve:'+name+'.'+method);
@@ -88,10 +120,17 @@ function flowHook(token,name,method,handlers){
    if(guards.has(tid)||!selected(token,name))return overload.apply(this,args);
    const debugCall=runtimeDebug.enter(key);
    try {
-   if(handlers.accept){let accepted=false;withGuard(()=>{accepted=handlers.accept.call(this,args);});if(!accepted)return overload.apply(this,args);}
+   if(handlers.accept){let accepted=false;withGuard(()=>{accepted=handlers.accept.call(this,args,signature);});if(!accepted)return overload.apply(this,args);}
+   if(handlers.kind==='flow.call'&&!allowAppCall(token,key))return overload.apply(this,args);
    const previous=flowThreads.get(tid),ctx={id:'flow-'+(++serial),kind:handlers.kind,token:token.name,
      api:key,started_ms:Date.now(),caller:[],parent:previous||null,signature,return_type:overload.returnType.className};
-   withGuard(()=>{if(handlers.stack===false)ctx.caller_attribution='unattributed: stack walk excluded at concurrent socket boundary';else ctx.caller=stack();if(ctx.caller.some(f=>f.class==='java.lang.reflect.Method'||f.class==='java.lang.reflect.Constructor'))ctx.invocation_mechanism='reflection_frame_observed';if(typeof discoverObjectFlow==='function')discoverObjectFlow(ctx.caller);if(handlers.before)handlers.before.call(this,args,ctx);});
+   let excluded=false;
+   withGuard(()=>{if(handlers.stack===false)ctx.caller_attribution='unattributed: stack walk excluded at concurrent socket boundary';else ctx.caller=stack();
+    const app=ctx.caller.find(f=>!(/^(android\.|androidx\.|java\.|javax\.|sun\.|dalvik\.|libcore\.|com\.android\.|org\.json\.|kotlin\.|kotlinx\.)/.test(f.class||'')||/^\/(system|apex|vendor)\//.test(f.origin||'')));
+    excluded=!!app&&(token.selection.exclude_prefixes||[]).some(p=>app.class===p||app.class.startsWith(p+'.'));
+    if(excluded)return;
+    if(ctx.caller.some(f=>f.class==='java.lang.reflect.Method'||f.class==='java.lang.reflect.Constructor'))ctx.invocation_mechanism='reflection_frame_observed';if(typeof discoverObjectFlow==='function')discoverObjectFlow(ctx.caller);if(handlers.before)handlers.before.call(this,args,ctx);});
+   if(excluded)return overload.apply(this,args);
    flowThreads.set(tid,ctx.id);
    try{
     const result=overload.apply(this,args);
@@ -151,6 +190,7 @@ function installFlows(){
      if(ctx.intent.action==='android.intent.action.VIEW'&&Object.prototype.hasOwnProperty.call(ctx.extras,'android.support.customtabs.extra.SESSION')){
       ctx.navigation_kind='custom_tab_intent';ctx.navigation_basis='observed_VIEW_intent_with_custom_tabs_session_extra';ctx.url=ctx.intent.data;
      }
+     if(typeof customTabsIntentObservation==='function')customTabsIntentObservation(intent,ctx,method.startsWith('startActivity'));
      ctx.intent_sources=[];
      for(const value of Object.values(ctx.extras))if(typeof value==='string'){
       const bytes=textBytes(value),source=bytes?flowSources.get(Checksum.compute('sha256',bytes)):null;
@@ -165,7 +205,7 @@ function installFlows(){
       if(readable&&candidates.length===1)ctx.launch_source={event:candidates[0].event,association:'inferred_equal_intent_fields'};
       else ctx.launch_attribution=!readable?'intent_extras_incomplete':candidates.length?'ambiguous_matching_launches':'launch_not_observed';
      }
-    }catch(e){}}});
+    }catch(e){}},error(args,error,ctx){if(ctx.navigation_kind==='custom_tab_intent'&&typeof tabFailure==='function')tabFailure(args,error,ctx);}});
   for(const method of ['loadUrl','postUrl','loadData','loadDataWithBaseURL','evaluateJavascript','addJavascriptInterface','removeJavascriptInterface']){
    flowHook(web,'android.webkit.WebView',method,{kind:'webview.'+method,
     before(args,ctx){ctx.webview=flowId(this);ctx.arguments=args.map(flowText);
@@ -206,7 +246,7 @@ function installFlows(){
      },after(a,r,c){c.return_value=flowText(r);}});
    },after(args,result,ctx){if(ctx.view_identity)remember(webviewClients,ctx.view_identity.id+'.'+method,{event:ctx.id,association:ctx.view_identity.association,client:ctx.client});}});
   flowHook(web,'android.webkit.WebResourceResponse','$init',{kind:'webview.resource_response',before(args,ctx){ctx.arguments=args.map(flowText);}});
-  event('coverage',{token:web.name,scope:'Platform WebView APIs, installed client overrides and annotated Java bridges',limitations:['Flow parents reflect observed synchronous nesting; asynchronous hops may be unattributed','Custom Tabs and renderer JS callsites not fully covered','Compose app code is attributed at platform boundaries']});
+  event('coverage',{token:web.name,scope:'Platform WebView APIs, installed client overrides and annotated Java bridges',limitations:['Flow parents reflect observed synchronous nesting; asynchronous hops may be unattributed','Renderer JS callsites are not exposed by platform callbacks','Compose app code is attributed at platform boundaries']});
  }catch(e){event('coverage',{token:web.name,state:'partial',reason:'Optional hook installation failed: '+flowText(e)});}
  if(parser)try{
   const nullClass=String(Java.use('org.json.JSONObject').NULL.value.getClass().getName());
@@ -255,23 +295,30 @@ function installFlows(){
      }catch(e){ctx.key={status:'unavailable',reason:'Key encoding unavailable: '+flowText(e)};}
     }
     const iv=this.getIV();ctx.iv=iv?payload(crypto,javaBytes(iv,0,iv.length),ctx,iv.length):{status:'absent',reason:'Algorithm has no IV'};
-    remember(flowObjects,flowId(this),{mode:ctx.mode,algorithm:ctx.algorithm,key:ctx.key,key_algorithm:ctx.key_algorithm,key_format:ctx.key_format,iv:ctx.iv,init_event:ctx.id});
+    ctx.cipher=navigationIdentity(this).id;
+    remember(flowObjects,ctx.cipher,{mode:ctx.mode,algorithm:ctx.algorithm,key:ctx.key,key_algorithm:ctx.key_algorithm,key_format:ctx.key_format,iv:ctx.iv,init_event:ctx.id});
    }});
   for(const method of ['update','doFinal','updateAAD'])flowHook(crypto,'javax.crypto.Cipher',method,{kind:'crypto.'+method,
    before(args,ctx){
-    Object.assign(ctx,flowObjects.get(flowId(this))||{key:{status:'unavailable',reason:'Initialization occurred before observation or metadata was evicted'}});
-    ctx.cipher=flowId(this);ctx.algorithm=String(this.getAlgorithm());
+    ctx.cipher=navigationIdentity(this).id;
+    Object.assign(ctx,flowObjects.get(ctx.cipher)||{key:{status:'unavailable',reason:'Initialization occurred before observation or metadata was evicted'}});
+    ctx.algorithm=String(this.getAlgorithm());
+    if(!ctx.iv){const iv=this.getIV();ctx.iv=iv?payload(crypto,javaBytes(iv,0,iv.length),ctx,iv.length):{status:'absent',reason:'Algorithm has no IV'};}
     ctx.direction=ctx.mode===1?'encrypt':ctx.mode===2?'decrypt':'other_or_unknown';
     ctx.previous_cipher_event=ctx.previous_event||null;delete ctx.previous_event;
     // doFinal(byte[], int) supplies an OUTPUT buffer; it is not ciphertext input.
     const outputOnly=method==='doFinal'&&ctx.signature.length===2&&ctx.signature[0]==='[B';
-    if(ctx.signature[0]==='[B'&&!outputOnly){
+    if(ctx.signature[0]==='java.nio.ByteBuffer'){
+     ctx.input=payload(crypto,bufferBytes(args[0],bufferPosition(args[0]),bufferRemaining(args[0])),ctx,bufferRemaining(args[0]));
+     if(ctx.signature[1]==='java.nio.ByteBuffer')ctx.output_buffer_offset=bufferPosition(args[1]);
+    }else if(ctx.signature[0]==='[B'&&!outputOnly){
      const offset=ctx.signature.length>=3?args[1]:0,length=ctx.signature.length>=3?args[2]:args[0].length;
      ctx.input=payload(crypto,javaBytes(args[0],offset,length),ctx,length);
-    }else ctx.input={status:'not_captured',reason:outputOnly||!args.length?'Input from previous update calls; follow previous_cipher_event':'Unsupported input representation'};
+    }else ctx.input={status:outputOnly||!args.length?'no_input':'not_captured',reason:outputOnly||!args.length?'Input from previous update calls; follow previous_cipher_event':'Unsupported input representation'};
    },
    after(args,result,ctx){
-    if(result&&ctx.return_type==='[B')ctx.output=payload(crypto,javaBytes(result,0,result.length),ctx,result.length);
+    if(ctx.signature[1]==='java.nio.ByteBuffer'&&ctx.return_type==='int'&&result>=0)ctx.output=payload(crypto,bufferBytes(args[1],ctx.output_buffer_offset,result),ctx,result);
+    else if(result&&ctx.return_type==='[B')ctx.output=payload(crypto,javaBytes(result,0,result.length),ctx,result.length);
     else if(ctx.return_type==='int'&&result>=0){
      const index=ctx.signature.lastIndexOf('[B');
      if(index>=0){const offset=ctx.signature[index+1]==='int'?args[index+1]:0;ctx.output=payload(crypto,javaBytes(args[index],offset,result),ctx,result);}
@@ -280,9 +327,12 @@ function installFlows(){
     const remembered=flowObjects.get(ctx.cipher);if(remembered)remembered.previous_event=ctx.id;
    }});
   flowHook(crypto,'android.util.Base64','decode',{kind:'crypto.base64',
-   before(args,ctx){if(ctx.signature[0]==='java.lang.String')ctx.input=payload(crypto,textBytes(args[0]),ctx,undefined,crypto.selection.capture_keys===true);},
+   before(args,ctx){
+    if(ctx.signature[0]==='java.lang.String')ctx.input=payload(crypto,textBytes(args[0]),ctx,undefined,crypto.selection.capture_keys===true);
+    else if(ctx.signature[0]==='[B'){const offset=ctx.signature.length===4?args[1]:0,length=ctx.signature.length===4?args[2]:args[0].length;ctx.input=payload(crypto,javaBytes(args[0],offset,length),ctx,length,crypto.selection.capture_keys===true);}
+   },
    after(args,result,ctx){if(result)ctx.output=payload(crypto,javaBytes(result,0,result.length),ctx,result.length,crypto.selection.capture_keys===true);ctx.raw_retention=crypto.selection.capture_keys===true?'enabled_by_scoped_crypto_token':'disabled: decoded material may be a key';}});
-  event('coverage',{token:crypto.name,scope:'Cipher byte-array operations and Android Base64 decode',key_material:crypto.selection.capture_keys===true?'exportable_encoding_requested':'not_requested',limitations:['Nonexportable keystore keys remain unavailable','Native and hand-rolled algorithms are not identified automatically','ByteBuffer overloads remain unsupported','Incremental operations retain fragments linked by previous_cipher_event; no fabricated combined message']});
+  event('coverage',{token:crypto.name,scope:'Cipher byte-array/ByteBuffer operations and Android Base64 decode',key_material:crypto.selection.capture_keys===true?'exportable_encoding_requested':'not_requested',limitations:['Nonexportable keystore keys remain unavailable','Native and hand-rolled algorithms are not identified automatically','Incremental operations retain fragments linked by previous_cipher_event']});
  }catch(e){event('coverage',{token:crypto.name,state:'partial',reason:'Optional hook installation failed: '+flowText(e)});}
  event('coverage.flow_hooks',{installed:Array.from(flowHooks),unavailable:Array.from(flowMissing,([target,reason])=>({target,reason})),object_correlation:'bounded identity-hash cache; collisions/evictions can reduce attribution'});
 }
@@ -346,10 +396,16 @@ function frameworkCoverage(){
 
 function installReflectionAndDecoders(){
  const reflection=tokens.get('reflection.java'),decoder=tokens.get('crypto.custom'),web=tokens.get('webview.platform');
- if(web){
-  for(const name of ['androidx.browser.customtabs.CustomTabsIntent','android.support.customtabs.CustomTabsIntent'])
-   flowHook(web,name,'launchUrl',{kind:'webview.custom_tab',before(args,ctx){ctx.url=args[1]?String(args[1].toString()):null;const bytes=ctx.url?textBytes(ctx.url):null;ctx.url_origin=bytes?flowSources.get(Checksum.compute('sha256',bytes))||{association:'unattributed'}:{association:'unattributed'};}});
- }
+ const stringToken=tokens.get('crypto.cipher')||tokens.get('flow.java')||decoder;
+ const appFlow=tokens.get('flow.java');
+ if(stringToken&&(!appFlow||appFlow.selection.trace_byte_strings!==false))flowHook(stringToken,'java.lang.String','$init',{kind:'crypto.string',
+  accept(args,signature){return signature[0]==='[B'&&args[0]!==null;},
+  before(args,ctx){
+   if(ctx.signature[0]!=='[B'){ctx.skip=true;return;}
+   const sliced=ctx.signature[1]==='int'&&ctx.signature[2]==='int',offset=sliced?args[1]:0,length=sliced?args[2]:args[0].length;
+   ctx.input=payload(stringToken,javaBytes(args[0],offset,length),ctx,length);ctx.direction='byte_array_to_string';
+  },after(args,result,ctx){if(!ctx.skip)ctx.output=observedValue(stringToken,this,'java.lang.String',ctx);}});
+ if(web&&typeof installCustomTabs==='function')installCustomTabs(web);
  if(reflection)try{
   // Replacing caller-sensitive reflection APIs changes Java access checks. Observe
   // constructor targets and target stacks instead; never force accessibility.
@@ -364,9 +420,7 @@ function installReflectionAndDecoders(){
  }catch(e){event('coverage',{token:reflection.name,state:'partial',reason:flowText(e)});}
  if(decoder)try{
   function encodedArgument(value,type,ctx){
-   if(type==='java.lang.String'&&value!==null)return payload(decoder,textBytes(value),ctx);
-   if(type==='[B'&&value!==null)return payload(decoder,javaBytes(value,0,value.length),ctx,value.length);
-   return {status:'unsupported',reason:'Only bounded String and byte[] values are retained',type};
+   return observedValue(decoder,value,type,ctx);
   }
   for(const selector of decoder.selection.methods||[])flowHook(decoder,selector.class,selector.method,{kind:'crypto.custom',
    before(args,ctx){ctx.algorithm='app_defined_unverified';ctx.direction='Observed app transformation';ctx.parameters=[];

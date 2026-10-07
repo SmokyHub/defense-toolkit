@@ -7,6 +7,7 @@ from pathlib import Path, PurePosixPath
 import re
 import subprocess
 import tempfile
+import time
 import zipfile
 from .config import get_config
 
@@ -23,7 +24,8 @@ def references(data,metadata):
     with tempfile.TemporaryDirectory(prefix='runtime-code-index-') as directory:
         root=Path(directory);source=root/'input.dex';source.write_bytes(data)
         with (root/'result.json').open('wb') as output, (root/'errors.log').open('wb') as errors:
-            subprocess.run([str(python),str(Path(__file__).with_name('code_index_worker.py')),str(source)],stdout=output,stderr=errors,timeout=60)
+            timeout=min(60,max(.01,float(metadata.get('index_timeout_seconds',60))))
+            subprocess.run([str(python),str(Path(__file__).with_name('code_index_worker.py')),str(source)],stdout=output,stderr=errors,timeout=timeout,check=True)
         result=root/'result.json'
         if result.stat().st_size>32*1024**2:raise ValueError('Code index output budget exceeded')
         if not result.stat().st_size:raise ValueError('Static worker unavailable, failed, or resource-limited; run bundle setup or set RUNTIME_CODE_ANALYSIS_PYTHON to a Python with Androguard')
@@ -65,23 +67,25 @@ def dex_inputs(path):
     return parent_hash,list(walk(raw,str(path.resolve())))
 
 
-def import_code(service,run,path,source=None):
+def import_code(service,run,path,source=None,deadline=None):
     digest,entries=dex_inputs(path)
     if not entries:raise ValueError('No standalone DEX entries in input')
     result=[]
     for origin,data in entries:
+        remaining=deadline-time.monotonic() if deadline is not None else 60
+        if remaining<=0:raise TimeoutError('Pre-launch static analysis time budget exhausted')
         if source and source.get('device_path'):
             origin=source['device_path']+('!'+origin.split('!',1)[1] if '!' in origin else '')
         snapshot=service.store.import_static(run,data,{'origin':origin,'container_sha256':digest,
-            'input_kind':'analyst_supplied_code','execution':'not_established','limitations':['Supplied code has not been verified against the running process'],**(source or {})})
+            'input_kind':'analyst_supplied_code','execution':'not_established','limitations':['Supplied code has not been verified against the running process'],**(source or {}),'index_timeout_seconds':min(60,remaining)})
         job=service.analyze(snapshot,'code.references')
         result.append({'snapshot':snapshot,'analysis':job['id'],'state':job['state'],'validity':job['result'].get('validity')})
     return {'input_sha256':digest,'artifacts':result,'execution':'not_established'}
 
 
 def search(service,run,query='',limit=100,since_ns=0,include='',exclude=''):
-    from .search_filters import patterns,matches,classes
-    include,exclude=patterns(include),patterns(exclude,exclusion=True)
+    from .search_filters import query_filters,matches,classes
+    query,include,exclude=query_filters(query,include,exclude)
     if type(since_ns) is not int or since_ns<0:raise ValueError('Invalid search time boundary')
     if not isinstance(query,str) or len(query)>2048:raise ValueError('Search text must be at most 2048 characters')
     if type(limit) is not int or not 1<=limit<=200:raise ValueError('Search result limit must be 1..200')
@@ -127,7 +131,7 @@ def search(service,run,query='',limit=100,since_ns=0,include='',exclude=''):
     for edge in edges:
         adjacent.setdefault(edge['from'],[]).append(edge);adjacent.setdefault(edge['to'],[]).append(edge)
     frontier=list(nodes)
-    for _ in range(4):
+    for _ in range(5):
         next_nodes=[]
         for node in frontier:
             for edge in adjacent.get(node,[]):
@@ -167,8 +171,8 @@ def search(service,run,query='',limit=100,since_ns=0,include='',exclude=''):
                     'decoder_classification':'observed_transformation; StringFog identity not established'}
             if len(runtime)>=100:break
         if runtime:
-            selected=next((r for r in runtime if r['kind'] in ('webview.loadUrl','webview.custom_tab')),runtime[0])
-            observed_flow=service.evidence(run,selected['id'])['flow']
+            selected=next((r for r in runtime if r['kind'] in ('webview.loadUrl','webview.custom_tab','webview.custom_tab_intent') or str(r['data'].get('navigation_kind','')).startswith('custom_tab')),runtime[0])
+            observed_flow=service.evidence(run,selected['id'],include=include,exclude=exclude)['flow']
             observed_flow['steps']=[step for step in observed_flow['steps'] if matches(step,include,exclude)]
             retained={step['event'] for step in observed_flow['steps']}
             observed_flow['edges']=[edge for edge in observed_flow['edges'] if edge['from'] in retained and edge['to'] in retained]
@@ -179,7 +183,7 @@ def search(service,run,query='',limit=100,since_ns=0,include='',exclude=''):
         node='event:'+row['id'];graph_nodes.append({'id':node,'label':row['kind'],'kind':'runtime_event','observation':row['id']})
         for root in sorted(roots)[:4]:selected_edges.append({'from':root,'to':node,'basis':'search_text_association_only','label':'matching search text; not causality'})
     return {'query':query,'static_hits':hits,'runtime_hits':runtime,'static_hit_count':total,'indexed_snapshots':len(seen),'diagnostics':diagnostics,
-        'graph':{'nodes':graph_nodes,'edges':selected_edges,'limits':{'nodes':96,'edges':256,'hops':4,'runtime_nodes':24}},'observed_flow':observed_flow,
+        'graph':{'nodes':graph_nodes,'edges':selected_edges,'limits':{'nodes':96,'edges':256,'hops':5,'runtime_nodes':24}},'observed_flow':observed_flow,
         'limitations':['Static graph edges are code references, not runtime/data-flow proof','Supplied DEX identity is not automatically associated with the installed APK',
          'Runtime search examines the latest 10000 observations; exact defining class may be unavailable for constructed/server/native strings',
          'Retained text search examines up to 256 recent payload snapshots and 8 MiB; binary/encrypted text requires an observed or statically recovered decoder output',
