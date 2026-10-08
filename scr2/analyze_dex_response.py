@@ -575,6 +575,7 @@ def flutter_discovery(artifacts, options):
         libapp = Path(temp) / 'libapp.so'
         libapp.write_bytes(apps[0]['data'])
         command = [python, str(worker), str(libapp)]
+        command.extend(['--flutter-reader', options.get('flutter_reader', 'auto')])
         for key, flag in [('blutter_dir', '--blutter-dir'), ('blutter_bin', '--blutter-bin')]:
             value = options.get(key)
             for item in value if isinstance(value, (list, tuple)) else [value] if value else []:
@@ -586,6 +587,8 @@ def flutter_discovery(artifacts, options):
         try:
             preparation = None
             if options.get('prepare_blutter'):
+                if options.get('flutter_reader') == 'python':
+                    raise ValueError('--flutter-reader python cannot be combined with --prepare-blutter')
                 from flutter_toolchain import prepare_external
                 engine = next((a for a in artifacts if a['path'] == 'lib/arm64-v8a/libflutter.so'), None)
                 if engine:
@@ -593,7 +596,8 @@ def flutter_discovery(artifacts, options):
                 preparation = prepare_external(python, Path(temp), options.get('blutter_dir'),
                                                options.get('blutter_bin'), options.get('blutter_build_timeout', 1800))
                 # Bind analysis to the exact prepared build, across multiple roots.
-                command = [python, str(worker), str(libapp), '--blutter-bin', preparation['analyzer']]
+                command = [python, str(worker), str(libapp), '--blutter-bin', preparation['analyzer'],
+                           '--flutter-reader', 'blutter']
                 if bridge: command.extend(['--bridge', str(Path(temp) / 'libdartjni.so')])
             # File-backed stdout prevents an unbounded host-memory allocation.
             with (Path(temp) / 'result.json').open('w+b') as output, (Path(temp) / 'stderr').open('w+b') as errors:
@@ -815,6 +819,8 @@ def main(argv=None):
     parser.add_argument('--prepare-blutter', action='store_true', help='Explicitly build a matching semantic analyzer; may download toolchain sources, never uploads the app')
     parser.add_argument('--blutter-build-timeout', type=int, default=1800, help='Preparation timeout in seconds (default 1800); cached builds are reused')
     parser.add_argument('--blutter-bin', help='Installed snapshot-compatible native Blutter analyzer; never a download wrapper')
+    parser.add_argument('--flutter-reader', choices=('auto', 'blutter', 'python'), default='auto',
+                        help='auto: native if compatible, otherwise supported Python snapshot reader; python: no Blutter or compilation')
     parser.add_argument('--semantic-python', help='Python with Androguard, Capstone and pyelftools (lab venv is auto-detected)')
     parser.add_argument('--payload-class', default=DEFAULT_CONTRACT['payload_class'])
     parser.add_argument('--entry-method', default=DEFAULT_CONTRACT['entry_method'])
@@ -822,6 +828,8 @@ def main(argv=None):
     parser.add_argument('--max-member-mib', type=int, default=256)
     args = parser.parse_args(argv)
     try:
+        if args.flutter_reader == 'python' and args.prepare_blutter:
+            raise AnalysisError('--flutter-reader python cannot be combined with --prepare-blutter')
         if args.proof_response is not None and (args.proof_response.exists() or args.proof_response.is_symlink()):
             raise AnalysisError('--proof-response path already exists; refusing to overwrite it')
         if not re.fullmatch(r'[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+', args.payload_class, re.ASCII):
@@ -835,7 +843,7 @@ def main(argv=None):
         result = run(args.input, args.out, load_profiles(args.profile, include_builtin=args.reviewed_profiles), contract,
                      {'max_bytes': args.max_total_mib * 1024**2, 'max_member': args.max_member_mib * 1024**2},
                      {'disabled': args.no_semantic, 'python': args.semantic_python, 'no_flutter': args.no_flutter,
-                      'blutter_dir': args.blutter_dir, 'blutter_bin': args.blutter_bin,
+                      'blutter_dir': args.blutter_dir, 'blutter_bin': args.blutter_bin, 'flutter_reader': args.flutter_reader,
                       'prepare_blutter': args.prepare_blutter, 'blutter_build_timeout': args.blutter_build_timeout})
         outputs = [{'package': application['package'], 'profile_id': match['profile_id'],
                     **{name: str(args.out / path) for name, path in match['files'].items()}}

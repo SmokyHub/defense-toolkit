@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Bounded offline AArch64 Flutter discovery. Never executes submitted code.
 
-Blutter is an installed analysis dependency, selected by the snapshot format hash,
-not by an application hash. No automatic downloads or per-application profiles.
+Native Blutter is selected by snapshot format and host compatibility. A bounded
+Python reader supports the documented older format without compiling a VM. Neither
+path selects application hashes or downloads per-application profiles.
 Incomplete consumer contracts remain evidence for review. Supported contracts
 retain conditional-path and library-semantic assumptions explicitly.
 """
@@ -631,11 +632,38 @@ def discover(data, pool, bridge=None, metadata=None):
             'diagnostics': ([] if findings else ['flutter_consumer_bindings_not_proven'] if candidates else ['no_supported_flutter_candidates'])}
 
 
+def load_snapshot(libapp, data, identity, directory=None, executable=None, reader='auto'):
+    """Select a compatible reader without executing an incompatible native VM."""
+    from dart_snapshot_reader import recover, supports
+    fallback = None
+    if reader == 'auto':
+        try:
+            choose_analyzer(identity, directory, executable)
+        except Unsupported as error:
+            if not supports(identity):
+                raise
+            fallback = str(error)
+            reader = 'python'
+    if reader == 'python':
+        pool, metadata = recover(data)
+        toolchain = {'reader': 'python_snapshot', 'analyzer': None, **identity,
+                     'schema': metadata['reader'], 'compilation_required': False}
+        if fallback:
+            toolchain['native_selection_diagnostic'] = fallback
+        return pool, toolchain, metadata
+    if reader not in ('auto', 'blutter'):
+        raise Unsupported('Unknown Flutter snapshot reader')
+    pool, analyzer, metadata = recover_pool(libapp, identity, directory, executable)
+    analyzer['reader'] = 'blutter'
+    return parse_pool(pool), analyzer, metadata
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('libapp', type=Path)
     parser.add_argument('--blutter-dir', action='append')
     parser.add_argument('--blutter-bin')
+    parser.add_argument('--flutter-reader', choices=('auto', 'blutter', 'python'), default='auto')
     parser.add_argument('--bridge', type=Path)
     args = parser.parse_args()
     try:
@@ -651,10 +679,11 @@ def main():
             resource.setrlimit(resource.RLIMIT_AS, (96 * 1024**3, 96 * 1024**3))
         data = read_bounded(args.libapp, MAX_ELF)
         identity = snapshot_identity(data)
-        pool, analyzer, metadata = recover_pool(args.libapp, identity, args.blutter_dir, args.blutter_bin)
+        pool, analyzer, metadata = load_snapshot(args.libapp, data, identity, args.blutter_dir,
+                                                args.blutter_bin, args.flutter_reader)
         if os.uname().sysname == 'Linux':
             resource.setrlimit(resource.RLIMIT_AS, (4 * 1024**3, 96 * 1024**3))
-        result = discover(data, parse_pool(pool), read_bounded(args.bridge, MAX_ELF) if args.bridge else None, metadata)
+        result = discover(data, pool, read_bounded(args.bridge, MAX_ELF) if args.bridge else None, metadata)
         result['toolchain'] = analyzer
     except (OSError, ValueError, ELFError, subprocess.TimeoutExpired) as error:
         result = {'findings': [], 'candidates': [], 'diagnostics': [f'flutter_analysis_unavailable: {error}']}

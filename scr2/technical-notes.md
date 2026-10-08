@@ -2,11 +2,12 @@
 
 Run from any working directory with Python 3.10 or newer. Keep `scripts/dex_semantic.py`,
 `scripts/flutter_semantic.py`, `scripts/flutter_contract.py`, `scripts/flutter_preferences.py`
+`scripts/dart_snapshot_reader.py`, `scripts/dart_snapshot_schema.py`, `scripts/flutter_toolchain.py`
 and `scripts/dex_response_proof.py`
 beside the main script when copying it. **Profiles are not
 loaded by default.** Automatic Dalvik analysis requires Androguard 4.1.4; Flutter discovery
-requires Capstone 5.0.7, pyelftools 0.33 and an installed snapshot-compatible native Blutter
-analyzer. The lab's
+requires Capstone 5.0.7 and pyelftools 0.33. Snapshot metadata comes from a compatible
+native Blutter analyzer or the supported Python snapshot reader described below. The lab's
 `~/tools/venv/bin/python` is selected automatically. Elsewhere, install
 `scripts/requirements-dex-response.txt` in a virtual environment and select its interpreter with
 `--semantic-python /path/to/venv/bin/python`. `--no-semantic` disables both discovery passes;
@@ -61,6 +62,48 @@ in their evidence; they are not proofs of network delivery or runtime execution.
 Unknown or unsupported loaders get candidate evidence and
 `needs_review`, not a guessed complete schema or a claim that loading is absent. Encrypted values
 available only from an unseen server cannot be recovered from the APK.
+
+## No compilation: Python snapshot reader alongside Blutter 3.12.1
+
+If only your existing Blutter 3.12.1 is allowed, use:
+
+```bash
+.venv/bin/python analyze_dex_response.py /path/application.zip \
+  --flutter-reader python --semantic-python .venv/bin/python \
+  --out results/python-case --proof-response ready-response.json
+```
+
+This path does not run, install, download or compile any Blutter/Dart version. Your
+existing 3.12.1 installation remains available for compatible apps. You may retain
+`--blutter-bin /path/blutter_dartvm3.12.1_android_arm64_semantic`, but it is unused in
+explicit `python` mode. Do not add `--prepare-blutter`; that combination is rejected.
+The usual Python dependencies are still required.
+
+The reader handles full-AOT, product, Android ARM64 compressed-pointer snapshots with
+format `78da37fed6bf1489361a312568249f3f` and the documented feature flags. This is the
+Dart 3.11.1-compatible **serialization format**, shared by Drift and the saved APK2;
+it is not a libapp file hash or an app allowlist. The reader derives the object pool,
+class IDs, field offsets, function entries, dispatch table and runtime stub identities
+from each submitted ELF. Copied stubs require an unambiguous exact byte match to a
+VM/store stub in that same ELF. No app-specific offsets, JSON keys, response packs,
+saved Blutter output or SDK source are loaded at runtime.
+
+`--flutter-reader auto` (the default) uses a compatible native analyzer if available,
+otherwise falls back to Python for this supported format, including when the pinned
+3.12.1 binary has a different snapshot format. `--flutter-reader blutter` requires the
+native path and preserves its compatibility checks. Reports identify the actual reader
+under `flutter_analysis.toolchain.reader`, and retain a native-selection diagnostic when
+fallback occurred. Python mode reports no native analyzer.
+
+This is bounded metadata recovery for the existing consumer analysis, not full Dart
+source reconstruction or a universal snapshot translator. Unknown formats/features,
+unsupported cluster layouts, deferred loading units and malformed records fail explicitly.
+New apps using the supported format and recognized flows are analyzed from their own bytes;
+new compiler/loader patterns can still return `needs_review`. The implementation is Python
+and has no host-native analyzer dependency; validation ran on Linux, **not on a Mac**.
+The regression tests compare metadata against saved native outputs for two distinct apps,
+and reanalyze a modified ELF with changed numeric keys. See
+`reports/flutter_python_reader_20261009/VALIDATION.md` in the repository.
 
 ## Outputs and automation contract
 
@@ -212,7 +255,7 @@ Names, package IDs, preassigned field order and known application hashes do not 
 Obfuscated helper names are linked only when their metadata appears in the submitted snapshot.
 The snapshot hash selects a parser format, not an application profile.
 
-Complete contract extraction requires the metadata-exporting Blutter extension shipped as
+On the native path, complete contract extraction requires the metadata-exporting Blutter extension shipped as
 `build_flutter_semantic_blutter.py` and `blutter_semantic_extension.inc`. After building stock
 Blutter for the required Dart VM, build/install the extension once per compatible VM:
 

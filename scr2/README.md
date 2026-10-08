@@ -30,11 +30,29 @@ a network request. Generation alone does not prove execution. Custom payload con
 missing/modified fixture get an explicit reason and no proof file; ordinary templates remain
 available. See `fixtures/README.md` for provenance.
 
-Automatic Flutter discovery needs a native Blutter build compatible with the app's Dart
-snapshot **and your computer's OS/CPU**. A build named `dartvm3.12.2` is a Dart VM build,
-not a universal Blutter version. Different snapshot formats need separate builds, which
-can coexist. The script checks the **snapshot format identifier inside `libapp.so`**, not
-an allowlist of app-file hashes.
+For a Mac where **only existing Blutter 3.12.1 is allowed and compilation is unavailable**:
+
+```bash
+.venv/bin/python analyze_dex_response.py /path/application.zip \
+  --flutter-reader python --semantic-python .venv/bin/python \
+  --out results/python-case --proof-response ready-response.json
+```
+
+The bundled Python reader supports the older snapshot format used by Drift and APK2
+(`78da37fed6bf1489361a312568249f3f`, Android ARM64 compressed-pointer full-AOT product).
+It reads the submitted ELF directly and uses no Blutter binary, compiler, SDK source,
+app-specific pack or cached analysis. Your existing 3.12.1 installation can stay in place;
+`--blutter-bin` is unused in explicit Python mode. Do not use `--prepare-blutter` with it.
+The format identifier is shared by apps; it is not a hash allowlist of client APKs/libapp.
+
+Default `--flutter-reader auto` first selects a compatible native analyzer, then falls
+back to Python when none matches and the snapshot format is supported. This also works
+with an incompatible pinned 3.12.1 analyzer. `--flutter-reader blutter` forces the native
+path. Reports name the reader actually used. Other formats still need compatible native
+Blutter builds for the host OS/CPU. Unknown formats or unsupported flows remain review
+items; this does not make Blutter 3.12.1 itself read every snapshot version.
+Python-reader validation ran on Linux against both saved apps and changed-key ELF bytes;
+Mac execution has not been independently tested.
 
 With an installed Blutter source checkout and its normal build dependencies, use this
 on macOS or Linux (the initial build may take many minutes):
@@ -57,8 +75,8 @@ or fix an upstream-unsupported snapshot; failures remain explicit.
 Without `--prepare-blutter`, analysis remains offline and never starts a build. Repeat
 `--blutter-dir` to search several installations; either the checkout root or its `bin/`
 directory is accepted. `BLUTTER_HOME` supplies the default root; otherwise `~/tools/blutter`
-and `~/blutter` are searched. `--blutter-bin` pins one already compatible native analyzer.
-Do not copy a Linux analyzer binary onto macOS; copy the portable scripts and build there.
+and `~/blutter` are searched. `--blutter-bin` pins native selection; auto mode may use the supported Python fallback.
+For native analysis, use a host-compatible binary. The Python path needs no native analyzer build.
 The extension preserves the stock build's compiler and macOS architecture/SDK settings.
 
 The automatic pass covers the tested APK1–APK3 collection/JNI paths and Drift's
@@ -77,7 +95,7 @@ Manual extension building is still available when the matching stock VM is insta
 ```
 
 Choose the stock build's actual Dart library name, not necessarily the example version.
-The tested Drift and APK2 snapshots use the compatible `dartvm3.11.1_android_arm64` build.
+Drift and APK2 can use the Python reader above; their native alternative is a compatible `dartvm3.11.1_android_arm64` build.
 The report retains conditional-path and JNI/library assumptions. It is a compatible static test
 contract, not proof of network delivery or runtime execution. Automatic Dalvik consumer analysis can emit complete templates for
 its supported bytecode patterns. Unsupported variants report review status, not an invented schema. This is offline
