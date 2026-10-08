@@ -22,6 +22,14 @@ def build(home, dartlib, output):
     shutil.copytree(home / 'blutter', output / 'blutter')
     for name in ('packages', 'scripts'):
         (output / name).symlink_to(home / name, target_is_directory=True)
+    # Blutter embeds this path and needs the template at analysis time. Resolve
+    # our scripts symlink now so installed binaries survive build-tree cleanup.
+    cmake = output / 'blutter/CMakeLists.txt'
+    config = cmake.read_text()
+    resource_anchor = 'get_filename_component(FRIDA_TEMPLATE_DIR "${PROJECT_SOURCE_DIR}/../scripts/" ABSOLUTE)'
+    if config.count(resource_anchor) != 1:
+        raise ValueError('Unsupported Blutter CMakeLists.txt: cannot locate runtime template path')
+    cmake.write_text(config.replace(resource_anchor, resource_anchor.replace(' ABSOLUTE)', ' REALPATH)')))
     main = output / 'blutter/src/main.cpp'
     source = main.read_text()
     anchor = '\n\t\tapp.ExitScope();\n\t}'
@@ -32,7 +40,7 @@ def build(home, dartlib, output):
     main.write_text(source)
     options = []
     for line in cache.read_text().splitlines():
-        m = re.fullmatch(r'((?:HAS_|NO_|OLD_|UNIFORM_)[A-Z_]+):[^=]+=(.*)', line)
+        m = re.fullmatch(r'((?:HAS_|NO_|OLD_|UNIFORM_)[A-Z_]+|CMAKE_(?:C_COMPILER|CXX_COMPILER|OSX_ARCHITECTURES|OSX_SYSROOT|OSX_DEPLOYMENT_TARGET)):[^=]+=(.*)', line)
         if m:
             options.append('-D' + m[1] + '=' + m[2])
     env = os.environ.copy()

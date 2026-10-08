@@ -87,21 +87,12 @@ def snapshot_identity(data):
 
 
 def choose_analyzer(identity, directory=None, executable=None):
-    """Require an embedded matching snapshot hash; never invoke the fetching wrapper."""
-    if executable:
-        candidates = [Path(executable).expanduser().resolve()]
-    else:
-        home = Path(directory or os.environ.get('BLUTTER_HOME', '~/tools/blutter')).expanduser()
-        candidates = (sorted((home / 'bin').glob('blutter_dartvm*_android_arm64_semantic')) +
-                      sorted((home / 'bin').glob('blutter_dartvm*_android_arm64')))[:128]
-    for path in candidates:
-        if not path.is_file() or not os.access(path, os.X_OK):
-            continue
-        data = read_bounded(path, MAX_ELF)
-        if identity['snapshot_hash'].encode() + b'\0' in data:
-            return path, hashlib.sha256(data).hexdigest()
-    raise Unsupported('No installed Blutter analyzer matches snapshot ' + identity['snapshot_hash'] +
-                      '; install/build a matching analyzer and use --blutter-dir or --blutter-bin')
+    """Require a compatible snapshot and host binary; never fetch during discovery."""
+    from flutter_toolchain import select
+    try:
+        return select(identity, directory, executable)
+    except ValueError as error:
+        raise Unsupported(str(error)) from error
 
 
 def recover_pool(libapp, identity, directory=None, executable=None, timeout=120):
@@ -123,6 +114,12 @@ def recover_pool(libapp, identity, directory=None, executable=None, timeout=120)
                 raise Unsupported(f'Blutter failed ({process.returncode}): {detail}')
         text = read_bounded(output / 'pp.txt', MAX_POOL).decode('utf-8')
         metadata_path = output / 'semantic.tsv'
+        if analyzer.name.endswith('_semantic') and not metadata_path.is_file():
+            log_path = Path(temp) / 'blutter.log'
+            with log_path.open('rb') as diagnostic:
+                diagnostic.seek(max(0, log_path.stat().st_size - 2048))
+                detail = diagnostic.read(2048).decode(errors='replace')
+            raise Unsupported('Semantic Blutter produced no semantic.tsv; rebuild with --prepare-blutter. ' + detail)
         metadata = parse_metadata(read_bounded(metadata_path, MAX_POOL).decode('ascii')) if metadata_path.is_file() else None
         if metadata is not None:
             metadata['stubs'] = parse_stubs(read_bounded(output / 'ida_script/addNames.py', MAX_POOL).decode('utf-8'))
@@ -637,7 +634,7 @@ def discover(data, pool, bridge=None, metadata=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('libapp', type=Path)
-    parser.add_argument('--blutter-dir')
+    parser.add_argument('--blutter-dir', action='append')
     parser.add_argument('--blutter-bin')
     parser.add_argument('--bridge', type=Path)
     args = parser.parse_args()

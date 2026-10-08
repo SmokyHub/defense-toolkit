@@ -94,17 +94,29 @@ def await_after(p, pc):
 
 
 def keyed_calls(p, keys, function):
-    result = []
+    # Constant provenance can originate in decimal conversion or in a pool load.
+    # In both cases the key must actually reach the following call's arguments.
+    events = []
     for key in keys:
         if int(key['function'], 16) != function: continue
-        start = int(key['address'], 16) + 12
+        events.append((int(key['address'], 16) + 12, 'x0', key['key'], key['address'], key['helper']))
+    for pc in p.functions[function]:
+        ref = p.refs.get(pc, '')
+        if not ref.startswith('String: '): continue
+        value = json.loads(ref[8:])
+        if not isinstance(value, str) or not value or len(value) > 256: continue
+        dst = register(p.code[pc][1].split(', ')[0])
+        if re.fullmatch(r'x\d+', dst):
+            events.append((pc + 4, dst, value, hex(pc), None))
+    result = []
+    for start, dst, value, address, helper in events:
         for a in range(start, start + 80, 4):
             if p.owner(a) != function: break
             op, args = p.code.get(a, ('', ''))
             if op == 'bl':
-                r, _, s, _ = snapshot(p, start, a, {'x0': ('key', key['key'])})
-                result.append({'key': key['key'], 'key_va': key['address'], 'decimal_helper': key['helper'],
-                               'pc': a, 'target': integer(args), 'registers': r, 'stack': s})
+                r, _, stack, _ = snapshot(p, start, a, {dst: ('key', value)})
+                result.append({'key': value, 'key_va': address, 'decimal_helper': helper,
+                               'pc': a, 'target': integer(args), 'registers': r, 'stack': stack})
                 break
             if op in ('b', 'ret', 'blr') or op.startswith('b.'): break
     return result
@@ -375,7 +387,7 @@ def discover_preferences(program):
     good_getters = {g for g in getters if channel_argument_packing(p, g, 2, 15)}
     if not good_getters: return {'flows': [], 'diagnostics': ['Preferences getter key packing is unresolved.']}
     groups = defaultdict(list)
-    for f in {int(k['function'], 16) for k in keys}:
+    for f in [f for f in p.functions if p.edges[f] & good_getters]:
         for access in keyed_calls(p, keys, f):
             r = access['registers']; aw = await_after(p, access['pc'])
             if access['target'] in good_getters and r.get('x2') == ('key', access['key']) and frame(r.get('x1')) and frame(r.get('x3')) and aw:
@@ -387,7 +399,7 @@ def discover_preferences(program):
             receivers = {(r['registers']['x1'], r['registers']['x3'], r['target']) for r in reads}
             if len(receivers) != 1: raise ValueError('Role reads do not share one preferences receiver/options source.')
             receiver, options, getter = next(iter(receivers))
-            # A decimal equality guard over a caller-supplied key precedes reads.
+            # A constant-string equality guard over a caller-supplied key precedes reads.
             guard_candidates = []
             for k in keyed_calls(p, keys, loader):
                 if k['pc'] >= reads[0]['pc'] or k['target'] == getter: continue
@@ -412,7 +424,7 @@ def discover_preferences(program):
                 raise ValueError('Preferences read/decoder blocks lack a connected possible CFG path.')
             wrappers = {f for f in p.functions if len(p.functions[f]) < 96 and loader in p.edges[f]}
             networks = []
-            for f in {int(k['function'], 16) for k in keys}:
+            for f in [f for f in p.functions if p.edges[f] & wrappers]:
                 direct = keyed_calls(p, keys, f)
                 trigger = [k for k in direct if k['target'] in wrappers and k['key'] == outer and k['registers'].get('x2') == ('key', outer) and frame(k['registers'].get('x1'))]
                 if not trigger: continue

@@ -166,12 +166,39 @@ python3 scripts/analyze_dex_response.py application.zip --out work/automatic-cas
   --blutter-dir /path/to/blutter
 ```
 
-The worker reads the Dart snapshot hash through ELF load-segment address mapping and chooses an
-already installed analyzer with the same embedded snapshot hash. `--blutter-bin` selects an explicit
-native analyzer; it must still match. `BLUTTER_HOME` supplies the directory default, otherwise
-`~/tools/blutter` is used. No fetching wrapper is invoked, no target code runs, and no server is contacted.
-Install/build matching Blutter tooling separately for a new snapshot format. Missing or incompatible
-tooling produces an actionable diagnostic, never a fallback to a guessed layout.
+The worker reads the Dart snapshot format hash through ELF load-segment address mapping
+and chooses an installed native analyzer with the same embedded format hash and a compatible
+host OS/CPU. This is **not the SHA-256 of `libapp.so`**: unrelated apps can share a snapshot
+format. File SHA-256 values are recorded as evidence, not used to select application profiles.
+`--blutter-bin` pins one native analyzer and must still match. Repeat `--blutter-dir` for
+multiple installations; checkout roots and `bin/` paths are supported. `BLUTTER_HOME` supplies
+the default root, otherwise `~/tools/blutter` and `~/blutter` are searched. Compatible semantic
+builds are preferred across all roots. Version names are not allowlisted.
+
+For explicit toolchain preparation, with upstream Blutter source already installed:
+
+```bash
+python3 scripts/analyze_dex_response.py application.zip --out work/prepared-case \
+  --blutter-dir /path/to/blutter --prepare-blutter --proof-response ready-response.json
+```
+
+Preparation stages `libapp.so` and `libflutter.so` from the same ARM64 input. It reuses a
+compatible semantic binary, or invokes the installed upstream wrapper to identify/build the
+matching stock VM and then builds the bundled semantic extension. Builds coexist in `bin/`.
+The wrapper may download Dart/toolchain sources; it does not upload the app or execute its
+code. Normal Blutter compiler/dependency requirements still apply. An unsupported upstream
+snapshot or extension API change fails explicitly. This flag does not install upstream Blutter.
+The default build timeout is 1,800 seconds (`--blutter-build-timeout` overrides it); timeout
+kills the setup process group, including compilers. A durable build log is printed to stderr
+and recorded as `toolchain_preparation.log` in the Flutter result. This setup runs outside the
+shorter analysis-worker limits. Existing stock binaries are preserved. Cached and freshly built semantic analyzers must produce parseable metadata and stub records on the input before preparation succeeds. The extension resolves its runtime template path to the installed upstream resources, so removing its temporary build tree does not break the installed binary.
+
+Without the preparation flag, no fetching wrapper or build is invoked and analysis remains
+offline. A 3.12.2 VM build cannot read an incompatible 3.11 snapshot merely because both are
+Blutter. On macOS, build native binaries locally; the extension inherits the stock build's
+compiler, architecture, SDK and deployment-target settings. Linux ELF analyzer binaries are
+rejected on macOS with a specific diagnostic. Native macOS execution has not been validated
+in this Linux lab; selection/header and compiler-setting behavior has unit-test coverage.
 
 The pass disassembles AArch64 executable load segments and reconstructs direct-call, object-pool and
 recoverable lazy-instance-initializer references. Numeric strings require a small-integer untagging
@@ -196,7 +223,7 @@ python3 scripts/build_flutter_semantic_blutter.py --blutter-dir /path/to/blutter
 
 For the lab APK2 snapshot, use `dartvm3.11.1_android_arm64` in a different fresh output directory.
 The helper copies stock source, reuses already-installed VM packages/build configuration, and
-leaves the stock analyzer intact. It does not download tooling. The default selector prefers the
+leaves the stock analyzer intact. This manual extension helper does not download tooling. The default selector prefers the
 matching `_semantic` analyzer. Stock Blutter still provides investigation candidates but lacks the
 metadata needed for a complete contract; the report names this prerequisite.
 
@@ -425,3 +452,18 @@ The automatic Flutter contract suite compares all three outputs with independent
 templates, checks changed-key rebinding and rejects missing dispatch metadata, a changed table
 provider, removed method/copy calls and a wrong invocation receiver. Full ZIP and standalone
 portable runs are recorded in `reports/family2_apk3_20260928/AUTOMATIC_DISCOVERY.md`.
+
+### Additional preferences-key variation coverage (2026-10-08)
+
+The async preferences recognizer now accepts string constants loaded from the Dart object
+pool as well as decimal strings constructed by recognized helpers. It selects candidate
+functions by their getter/wrapper call edges rather than the presence of numeric constants.
+A key must still reach the actual lookup, equality guard or handoff argument. Codec, cache
+receiver, map source, async completion and JNI role checks remain required.
+
+Tests replace all numeric key constructions with renamed literal loads in the saved program's
+intermediate representation and check all eleven recovered JNI roles. Mixed literal/numeric
+keys also work; outer-key disagreement and role collisions fail. These are IR mutation tests,
+not runtime validation of newly compiled variants. Original-byte numeric mutations and all
+four saved Flutter apps are regression-tested separately. No claim of universal support for
+future compiler output, storage APIs, codecs or arbitrary loading topologies is made.

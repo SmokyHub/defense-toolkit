@@ -30,21 +30,54 @@ a network request. Generation alone does not prove execution. Custom payload con
 missing/modified fixture get an explicit reason and no proof file; ordinary templates remain
 available. See `fixtures/README.md` for provenance.
 
-Automatic Flutter discovery also needs an installed native Blutter analyzer compatible with the
-submitted Dart snapshot. Set `--blutter-dir /path/to/blutter` or `--blutter-bin /path/to/analyzer`.
-No Blutter, emulator or Frida binary is bundled; discovery never downloads tooling automatically.
+Automatic Flutter discovery needs a native Blutter build compatible with the app's Dart
+snapshot **and your computer's OS/CPU**. A build named `dartvm3.12.2` is a Dart VM build,
+not a universal Blutter version. Different snapshot formats need separate builds, which
+can coexist. The script checks the **snapshot format identifier inside `libapp.so`**, not
+an allowlist of app-file hashes.
 
-The automatic Flutter pass generates APK1–APK3 and the tested Drift preferences-mediated
-loader templates without application profiles. Keep `flutter_preferences.py` with the other modules.
-It requires the semantic metadata extension to the compatible stock Blutter build:
+With an installed Blutter source checkout and its normal build dependencies, use this
+on macOS or Linux (the initial build may take many minutes):
 
 ```bash
-python3 build_flutter_semantic_blutter.py --blutter-dir /path/to/blutter \
+.venv/bin/python analyze_dex_response.py /path/application.zip \
+  --blutter-dir /path/to/blutter --prepare-blutter \
+  --out results/new-flutter-case --proof-response ready-response.json
+```
+
+`--prepare-blutter` asks the installed upstream Blutter wrapper to determine/build the
+matching stock Dart VM if missing, then builds the bundled semantic metadata extension.
+It can download toolchain sources; the APK stays local and its code is not executed.
+Existing compatible semantic builds are reused. Stock builds and other versions are
+preserved. Setup prints a persistent log path to stderr. The default timeout is 1,800
+seconds; use `--blutter-build-timeout 3600` for slower builds. Include `libflutter.so` and
+`libapp.so` from the **same ARM64 split set**. Preparation cannot fetch a Blutter checkout
+or fix an upstream-unsupported snapshot; failures remain explicit.
+
+Without `--prepare-blutter`, analysis remains offline and never starts a build. Repeat
+`--blutter-dir` to search several installations; either the checkout root or its `bin/`
+directory is accepted. `BLUTTER_HOME` supplies the default root; otherwise `~/tools/blutter`
+and `~/blutter` are searched. `--blutter-bin` pins one already compatible native analyzer.
+Do not copy a Linux analyzer binary onto macOS; copy the portable scripts and build there.
+The extension preserves the stock build's compiler and macOS architecture/SDK settings.
+
+The automatic pass covers the tested APK1–APK3 collection/JNI paths and Drift's
+preferences-mediated path without application profiles. Numeric, literal string and mixed
+preference keys are derived from their use in the loader, including changed key names.
+Keep `flutter_toolchain.py`, `flutter_preferences.py` and the other modules together.
+This supports variations of the recognized flow; arbitrary future Flutter versions,
+compiler transformations or different loaders are **not guaranteed**. Unsupported or
+ambiguous flows remain `needs_review`, with no guessed proof response.
+
+Manual extension building is still available when the matching stock VM is installed:
+
+```bash
+.venv/bin/python build_flutter_semantic_blutter.py --blutter-dir /path/to/blutter \
   --dartlib dartvm3.12.2_android_arm64 --out build/semantic-3.12.2 --install
 ```
 
-Build the matching stock analyzer first; use a fresh output directory. APK2 uses the compatible
-`dartvm3.11.1_android_arm64` build, also compatible with the tested Drift snapshot. The extension downloads nothing and does not execute app code.
+Choose the stock build's actual Dart library name, not necessarily the example version.
+The tested Drift and APK2 snapshots use the compatible `dartvm3.11.1_android_arm64` build.
 The report retains conditional-path and JNI/library assumptions. It is a compatible static test
 contract, not proof of network delivery or runtime execution. Automatic Dalvik consumer analysis can emit complete templates for
 its supported bytecode patterns. Unsupported variants report review status, not an invented schema. This is offline

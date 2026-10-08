@@ -4,7 +4,8 @@
 Automatic offline Dalvik consumer analysis and bounded Flutter discovery.
 Reviewed AOT profiles are optional and must be explicitly selected on the CLI.
 Unresolved flows remain inconclusive. No sample code, device, backend or external
-service is used. See docs/dex-response-analyzer.md.
+service is used for analysis. Explicit --prepare-blutter may download toolchain
+sources through an installed Blutter checkout. See docs/dex-response-analyzer.md.
 """
 from __future__ import annotations
 
@@ -575,13 +576,25 @@ def flutter_discovery(artifacts, options):
         libapp.write_bytes(apps[0]['data'])
         command = [python, str(worker), str(libapp)]
         for key, flag in [('blutter_dir', '--blutter-dir'), ('blutter_bin', '--blutter-bin')]:
-            if options.get(key):
-                command.extend([flag, str(options[key])])
+            value = options.get(key)
+            for item in value if isinstance(value, (list, tuple)) else [value] if value else []:
+                command.extend([flag, str(item)])
         if bridge:
             path = Path(temp) / 'libdartjni.so'
             path.write_bytes(bridge['data'])
             command.extend(['--bridge', str(path)])
         try:
+            preparation = None
+            if options.get('prepare_blutter'):
+                from flutter_toolchain import prepare_external
+                engine = next((a for a in artifacts if a['path'] == 'lib/arm64-v8a/libflutter.so'), None)
+                if engine:
+                    (Path(temp) / 'libflutter.so').write_bytes(engine['data'])
+                preparation = prepare_external(python, Path(temp), options.get('blutter_dir'),
+                                               options.get('blutter_bin'), options.get('blutter_build_timeout', 1800))
+                # Bind analysis to the exact prepared build, across multiple roots.
+                command = [python, str(worker), str(libapp), '--blutter-bin', preparation['analyzer']]
+                if bridge: command.extend(['--bridge', str(Path(temp) / 'libdartjni.so')])
             # File-backed stdout prevents an unbounded host-memory allocation.
             with (Path(temp) / 'result.json').open('w+b') as output, (Path(temp) / 'stderr').open('w+b') as errors:
                 process = subprocess.Popen(command, stdout=output, stderr=errors,
@@ -607,6 +620,7 @@ def flutter_discovery(artifacts, options):
                 result = json_load(raw)
                 if not isinstance(result, dict) or not isinstance(result.get('findings'), list):
                     raise AnalysisError('Invalid Flutter-worker result')
+                if preparation: result['toolchain_preparation'] = preparation
                 result['artifact'] = {'path': apps[0]['path'], 'sha256': apps[0]['sha256']}
                 if bridge:
                     result['bridge_artifact'] = {'path': bridge['path'], 'sha256': bridge['sha256']}
@@ -797,7 +811,9 @@ def main(argv=None):
     parser.add_argument('--reviewed-profiles', action='store_true', help='Opt in to bundled reviewed Flutter profiles (legacy path)')
     parser.add_argument('--no-semantic', action='store_true', help='Disable all automatic code analysis')
     parser.add_argument('--no-flutter', action='store_true', help='Disable automatic Flutter discovery only')
-    parser.add_argument('--blutter-dir', help='Installed Blutter directory; default BLUTTER_HOME or ~/tools/blutter')
+    parser.add_argument('--blutter-dir', action='append', help='Installed Blutter root or bin directory; repeat for multiple installations')
+    parser.add_argument('--prepare-blutter', action='store_true', help='Explicitly build a matching semantic analyzer; may download toolchain sources, never uploads the app')
+    parser.add_argument('--blutter-build-timeout', type=int, default=1800, help='Preparation timeout in seconds (default 1800); cached builds are reused')
     parser.add_argument('--blutter-bin', help='Installed snapshot-compatible native Blutter analyzer; never a download wrapper')
     parser.add_argument('--semantic-python', help='Python with Androguard, Capstone and pyelftools (lab venv is auto-detected)')
     parser.add_argument('--payload-class', default=DEFAULT_CONTRACT['payload_class'])
@@ -812,13 +828,15 @@ def main(argv=None):
             raise AnalysisError('Invalid Java payload class name')
         if not re.fullmatch(r'[A-Za-z_$][\w$]*', args.entry_method, re.ASCII):
             raise AnalysisError('Invalid Java entry method name')
+        integer(args.blutter_build_timeout, 'Blutter build timeout', 1, 14400)
         integer(args.max_total_mib, 'total size limit', 1, 16384)
         integer(args.max_member_mib, 'member size limit', 1, 2048)
         contract = {**DEFAULT_CONTRACT, 'payload_class': args.payload_class, 'entry_method': args.entry_method}
         result = run(args.input, args.out, load_profiles(args.profile, include_builtin=args.reviewed_profiles), contract,
                      {'max_bytes': args.max_total_mib * 1024**2, 'max_member': args.max_member_mib * 1024**2},
                      {'disabled': args.no_semantic, 'python': args.semantic_python, 'no_flutter': args.no_flutter,
-                      'blutter_dir': args.blutter_dir, 'blutter_bin': args.blutter_bin})
+                      'blutter_dir': args.blutter_dir, 'blutter_bin': args.blutter_bin,
+                      'prepare_blutter': args.prepare_blutter, 'blutter_build_timeout': args.blutter_build_timeout})
         outputs = [{'package': application['package'], 'profile_id': match['profile_id'],
                     **{name: str(args.out / path) for name, path in match['files'].items()}}
                    for application in result['apps'] for match in application['matches']]
