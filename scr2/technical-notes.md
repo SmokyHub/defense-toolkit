@@ -1,7 +1,9 @@
 # Offline DEX response analyzer
 
 Run from any working directory with Python 3.10 or newer. Keep `scripts/dex_semantic.py`,
-`scripts/flutter_semantic.py` and `scripts/flutter_contract.py` beside the main script when copying it. **Profiles are not
+`scripts/flutter_semantic.py`, `scripts/flutter_contract.py`, `scripts/flutter_preferences.py`
+and `scripts/dex_response_proof.py`
+beside the main script when copying it. **Profiles are not
 loaded by default.** Automatic Dalvik analysis requires Androguard 4.1.4; Flutter discovery
 requires Capstone 5.0.7, pyelftools 0.33 and an installed snapshot-compatible native Blutter
 analyzer. The lab's
@@ -16,6 +18,20 @@ python3 /home/nyx/Documents/apk_defense/scripts/analyze_dex_response.py \
 ```
 
 By default the terminal prints a status summary with paths to the generated template and schemas.
+For the default benign entry contract, it also writes **`response.proof.json` with the actual
+benign DEX bytes already encoded for the recovered field**. Use that file directly for an
+authorized response-replacement test; no manual `DEX ARRAY` substitution is required.
+The portable Family2 folder includes the hash-pinned fixture under `fixtures/`.
+
+To export that ready-to-use response to a convenient fresh file:
+
+```bash
+python3 scripts/analyze_dex_response.py application.zip --out work/new-proof-analysis \
+  --proof-response work/ready-response.json
+```
+
+The explicit export requires exactly one complete app/loader with the compatible benign
+contract and refuses to overwrite a file. Default per-loader proofs remain under `--out`.
 To print the filled response JSON itself, use `--print-template`:
 
 ```bash
@@ -36,7 +52,8 @@ running, uploading, or contacting the app/backend.
 **The default uses automatic discovery, with different coverage for Dalvik and Flutter.**
 The Dalvik/Java/Kotlin consumer analyzer derives
 new JSON keys, packed method fields and app-owned entry names from bytecode without a matching
-profile. Flutter analysis now emits the filled loader contracts for APK1–APK3 without
+profile. Flutter analysis now emits the filled loader contracts for APK1–APK3 and the tested
+preferences-mediated Drift variant without
 application profiles. It derives key paths and roles from receiver/argument relationships,
 lazy-initializer metadata, concrete dispatch targets and JNI bridge relocations. These are
 **conditional static test contracts**, with branch and library-semantic assumptions retained
@@ -67,18 +84,32 @@ available only from an unseen server cannot be recovered from the APK.
 - Unresolved cases: candidate loader/network strings and bounded ARM64 numeric-string construction
   hints. These are not a recovered source-to-sink path. Generic SDK/JNI hits never establish loading.
 
-Each complete match produces three files under `<package>/<profile-id>/`:
+Each complete match produces these files under `<package>/<profile-id>/`:
 
 | File | Purpose |
 |---|---|
 | `response.template.json` | Filled compatible loader response with literal `"DEX ARRAY"` in place of bytes |
+| `response.proof.json` | Ready-to-use response containing the bundled benign DEX, when its entry contract is compatible |
 | `template.schema.json` | JSON Schema 2020-12 contract accepting that placeholder template |
 | `response.schema.json` | JSON Schema contract for the response after substituting the detected DEX representation |
 
 The wire schema deliberately rejects `"DEX ARRAY"`. Depending on the recovered consumer, it expects
 a byte array or a Base64/Base64URL string. Array schemas allow integer bytes and decimal-byte
 strings. It validates structure, not DEX format, signature,
-loadability, or the presence of the requested class/method. No DEX payload is generated.
+loadability, or the presence of the requested class/method. The proof response inserts the
+existing source-built 5,120-byte fixture; it does not compile a new payload. Its SHA-256 is
+`8de5fb444a932ad2eb5af51fb1082f4cf6d293441808f37ab84e546e936017d0`. Numeric-array,
+Base64 and Base64URL fields are filled according to their recovered `dex_encodings`.
+The fixture displays local HTML headed “APK Defense: DEX executed” and a button that changes
+to “DEX button handler executed”; its entry makes no network request. A generated proof is
+still a **conditional test input**, with `runtime_validated_this_run: false` in its metadata.
+Actual execution and screenshots require a separate runtime test.
+
+A custom or app-owned class/method contract that differs from the fixture retains its ordinary
+template and gets an explicit proof-unavailable reason. Missing or modified fixture bytes also
+prevent proof generation; the exact size/hash is checked. `--proof-response` fails explicitly
+when no compatible proof is available. `--print-template` deliberately retains the placeholder
+template behavior.
 Unrelated UI/config settings are outside the generated **loader-branch** schema; additional object
 properties are allowed. This is a compatible validation response, not the original production response.
 Multiple independently resolved paths produce separate templates; incompatible alternatives are
@@ -183,6 +214,22 @@ packed-string/array method fields, hardcoded entries, other byte encodings, othe
 arbitrary compiler register allocations are not advertised. Such cases require review; the broader
 Dalvik variations below must not be confused with AOT coverage.
 
+The tested asynchronous preferences variant has an additional boundary: the selected JSON object
+is iterated into `SharedPreferencesAsyncApi.setString`; strings are stored directly, while
+nonstrings are serialized as Base64 of UTF-8 JSON. The loader reads those keys using
+`SharedPreferencesAsyncApi.getString`, awaits their values, reverses the byte-array serialization,
+then follows the same JNI construction chain. The response still carries a **JSON byte array**;
+the Base64 form is an internal preferences representation, not the wire value. The analyzer checks
+key/value packing, map iteration, the writer-to-loader handoff, codec argument flow and the
+downstream JNI receivers. It derives the selectors from the submitted instructions rather than
+using Drift's package name, fixed numeric keys or an application profile.
+
+This boundary supports the tested Pigeon/async compiler topology. Other preference stores,
+serialization chains, async layouts or JNI consumers remain `needs_review`. Its evidence appears
+under `preferences_boundary`, including the read/write calls, codecs and explicit success-path
+and standard-library assumptions. Static agreement does not prove that an actual network response
+was delivered or that code executed; a separate benign runtime validation is needed for that claim.
+
 The analysis follows a conditional success path. Concrete type/identity tests are evaluated where
 modeled; unresolved branch predicates are retained as assumptions. GetGlobalEnv is checked against
 ELF relocations for the exported table identity. Candidate slot records still say
@@ -213,6 +260,8 @@ This explicitly enables the previous guarded matching path and requires `dex_res
 beside the script. `--profile /path/local.json` enables only the specified reviewed profile unless
 `--reviewed-profiles` is also supplied. The default never reads that directory. Legacy templates
 remain available as an explicit compatibility mode; automatic APK1–APK3 extraction no longer requires them.
+Portable bundles omit these legacy profiles by default; a bundle can include them explicitly with
+`scripts/build_portable_toolkit.py --include-reviewed-profiles`.
 For legacy-only operation without worker dependencies, combine `--reviewed-profiles --no-semantic`.
 
 ## Automatic Dalvik discovery

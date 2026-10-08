@@ -23,6 +23,7 @@ import subprocess
 import zipfile
 from collections import defaultdict
 from pathlib import Path, PurePosixPath
+from dex_response_proof import build_proof, ProofUnavailable
 
 FORMAT = 'apk-defense.dex-response/v1'
 PLACEHOLDER = 'DEX ARRAY'
@@ -770,6 +771,15 @@ def run(input_path, out_dir, profiles, contract, limits, semantic_options=None):
                                       ('response_schema', 'response.schema.json')]:
                     (target / filename).write_text(json.dumps(rendered[key], indent=2, ensure_ascii=False) + '\n')
                     match['files'][key] = (relative / filename).as_posix()
+                try:
+                    proof, metadata = build_proof(rendered, match.get('resolved_contract', contract))
+                    filename = 'response.proof.json'
+                    (target / filename).write_text(json.dumps(proof, indent=2, ensure_ascii=False) + '\n')
+                    match['files']['proof_response'] = (relative / filename).as_posix()
+                    match['proof_response'] = metadata
+                except ProofUnavailable as error:
+                    match['proof_response'] = {'status': 'unavailable', 'runtime_validated_this_run': False,
+                                               'reason': str(error)}
         (staging / 'analysis.json').write_text(json.dumps(result, indent=2, ensure_ascii=False) + '\n')
         staging.rename(out_dir)
     return result
@@ -779,6 +789,8 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=Path, help='APK, ZIP of APK splits, APKS, XAPK or APKM; never uploaded')
     parser.add_argument('--out', required=True, type=Path, help='Fresh output directory')
+    parser.add_argument('--proof-response', type=Path,
+                        help='Also export the generated benign DEX response to a fresh file; requires one compatible complete loader')
     parser.add_argument('--print-template', action='store_true',
                         help='Print only the filled response JSON for one complete app; diagnostics go to stderr')
     parser.add_argument('--profile', action='append', default=[], help='Additional locally reviewed JSON loader profile')
@@ -794,6 +806,8 @@ def main(argv=None):
     parser.add_argument('--max-member-mib', type=int, default=256)
     args = parser.parse_args(argv)
     try:
+        if args.proof_response is not None and (args.proof_response.exists() or args.proof_response.is_symlink()):
+            raise AnalysisError('--proof-response path already exists; refusing to overwrite it')
         if not re.fullmatch(r'[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+', args.payload_class, re.ASCII):
             raise AnalysisError('Invalid Java payload class name')
         if not re.fullmatch(r'[A-Za-z_$][\w$]*', args.entry_method, re.ASCII):
@@ -810,6 +824,16 @@ def main(argv=None):
                    for application in result['apps'] for match in application['matches']]
         summary = {'format': FORMAT, 'status': result['status'], 'report': str(args.out / 'analysis.json'),
                    'apps': len(result['apps']), 'outputs': outputs}
+        if args.proof_response is not None:
+            if result['status'] != 'complete' or len(result['apps']) != 1 or len(outputs) != 1:
+                raise AnalysisError('--proof-response requires exactly one complete app and loader path')
+            if 'proof_response' not in outputs[0]:
+                reason = result['apps'][0]['matches'][0]['proof_response']['reason']
+                raise AnalysisError('Benign proof response unavailable: ' + reason)
+            args.proof_response.parent.mkdir(parents=True, exist_ok=True)
+            with args.proof_response.open('x', encoding='utf-8') as exported:
+                exported.write(Path(outputs[0]['proof_response']).read_text())
+            summary['proof_response_export'] = str(args.proof_response)
         if args.print_template:
             if result['status'] != 'complete':
                 print(json.dumps(summary), file=sys.stderr)

@@ -542,6 +542,7 @@ class Program:
         return list(results.values())
 def discover(data, pool, bridge=None, metadata=None):
     from flutter_contract import recover_contract, Unresolved
+    from flutter_preferences import discover_preferences
     program = Program(data, pool, metadata)
     keys = program.numeric_keys()
     groups = defaultdict(list)
@@ -604,7 +605,25 @@ def discover(data, pool, bridge=None, metadata=None):
                 candidates[-1]['contract_diagnostic'] = str(error)
         elif accesses:
             candidates[-1]['contract_diagnostic'] = 'JNI bridge table provider not validated'
+    preferences = discover_preferences(program) if origin and metadata else {'flows': [], 'diagnostics': []}
+    for boundary in preferences['flows']:
+        function = int(boundary['loader_function'], 16)
+        candidate = {'function': hex(function), 'status': 'unresolved',
+                     'boundary': 'async_preferences', 'preferences_evidence': boundary}
+        candidates.append(candidate)
+        try:
+            finding = recover_contract(program, function,
+                                       [boundary['byte_access'], *boundary['accesses']], bindings, boundary)
+            finding['evidence'].update(bridge_origin=origin,
+                                       libapp_sha256=hashlib.sha256(data).hexdigest(),
+                                       bridge_sha256=hashlib.sha256(bridge).hexdigest())
+            findings.append(finding)
+            candidate['status'] = 'conditional_contract_recovered'
+            candidate['limitations'] = finding['evidence']['assumptions']
+        except Unresolved as error:
+            candidate['contract_diagnostic'] = str(error)
     return {'findings': findings, 'candidates': candidates,
+            'preferences_diagnostics': preferences['diagnostics'],
             'coverage_limits': {'numeric_candidate_limit_reached': program.numeric_limit_reached,
                                 'literal_group_limit_reached': literal_groups >= MAX_CANDIDATES,
                                 'literal_function_size_exclusions': large_functions,

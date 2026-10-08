@@ -30,9 +30,10 @@ def imm(value):
 
 
 class Slice:
-    def __init__(self, program, bindings):
+    def __init__(self, program, bindings, boundary=None):
         self.p = program
         self.bindings = bindings
+        self.boundary = boundary
         self.classifications = {}
         self.events = []
         self.unknown = []
@@ -155,6 +156,14 @@ class Slice:
         for a in accesses:
             if a['receiver'][0] == 'frame' and a['receiver'][1].startswith('#'):
                 slot = imm(a['receiver'][1]); frame[slot] = Value('input_frame', (slot,))
+        preference_root = None
+        if self.boundary:
+            # This wire-object identity is supplied only by the independently
+            # checked map/write/read boundary, never by a getter's name alone.
+            preference_root = Value('field', (Value('input_frame', ('preferences_wire',)),
+                                             self.boundary['outer_key'],
+                                             int(self.boundary['outer_access_va'], 16)))
+            preference_root.fields['expected_type'] = 'map'
         pc = first; seen = set(); steps = 0; comparison = None
         while pc in self.p.code and self.p.owner(pc) == f and pc not in seen and steps < 12000:
             seen.add(pc); steps += 1
@@ -166,7 +175,9 @@ class Slice:
                 receiver = registers.get('x1')
                 if receiver is None and access['receiver'][0] == 'frame':
                     receiver = frame.get(imm(access['receiver'][1]))
-                expected = self.expected_type(pc)
+                if preference_root is not None:
+                    receiver = preference_root
+                expected = access.get('expected_type') if self.boundary else self.expected_type(pc)
                 result = Value('field', (receiver, access['key'], pc), cid=self.builtins.get(expected))
                 result.fields['expected_type'] = expected
                 registers = {'x22': None, 'x0': result}
@@ -248,7 +259,7 @@ class Slice:
                 # This is a conditional success-path abstraction, not a runtime
                 # execution proof. Retain every branch assumption in the output.
                 if op != 'tst':
-                    taken = None
+                    taken = None; conditional = False
                     if op.startswith('b.') and comparison is not None:
                         left, right = comparison
                         tests = {'eq': left == right, 'ne': left != right, 'ls': left <= right, 'hi': left > right,
@@ -257,6 +268,10 @@ class Slice:
                         taken = tests.get(op[2:])
                     elif op in ('tbz', 'tbnz'):
                         value = registers.get(reg(parts[0])); bit = imm(parts[1])
+                        if isinstance(value, Value) and value.kind == 'list_empty_test' and bit == 4:
+                            # Select a nonempty input list. Keep this a condition,
+                            # not a claim about the bytes received at runtime.
+                            taken = op == 'tbnz'; conditional = True
                         if isinstance(value, Value) and bit == 0: value = 1
                         if isinstance(value, int): taken = bool(value & (1 << bit)) == (op == 'tbnz')
                     elif op in ('cbz', 'cbnz') and isinstance(registers.get(reg(parts[0])), int):
@@ -267,7 +282,7 @@ class Slice:
                         next_pc = target
                     self.guards.append({'address': hex(pc), 'instruction': op + ' ' + args,
                                         'selected_edge': 'branch' if taken else 'fallthrough',
-                                        'status': 'resolved_for_test_input' if taken is not None else 'path_condition'})
+                                        'status': 'resolved_for_test_input' if taken is not None and not conditional else 'path_condition'})
                 else:
                     comparison = None
             elif dst.startswith('x'):
@@ -346,6 +361,16 @@ class Slice:
                 self.transfers.append({'call': hex(pc), 'function': hex(table), 'operation': 'identity_toString'})
                 return original
             body = [self.p.code[a] for a in self.p.functions[table]]
+            receiver = registers.get('x1')
+            if (isinstance(receiver, Value) and receiver.fields.get('expected_type') == 'list' and
+                    body[:1] == [('ldur', 'w2, [x1, #0xb]')] and len(body) >= 6 and
+                    body[1] == ('cbz', 'w2, #' + hex(table + 16)) and
+                    body[2] == ('add', 'x0, x22, #0x30') and
+                    body[3] == ('b', '#' + hex(table + 20)) and
+                    body[4:6] == [('add', 'x0, x22, #0x20'), ('ret', '')]):
+                self.transfers.append({'call': hex(pc), 'function': hex(table),
+                                       'operation': 'list_empty_test', 'condition': 'input list is nonempty'})
+                return Value('list_empty_test', (receiver,))
             # List.map stores the receiver and closure in a fresh iterable.
             if (isinstance(original, Value) and original.kind == 'closure' and
                     isinstance(stack.get(8), Value) and
@@ -513,7 +538,8 @@ def match_contract(slice_, invocation, function):
             'unresolved JNI table provider context')
     # Identify JSON parsing and request-building context independently of field
     # roles. Do not label call-graph proximity as verified network byte provenance.
-    prior_calls = [imm(program.code[a][1]) for a in program.functions[function]
+    parser_function = int(slice_.boundary['network_function'], 16) if slice_.boundary else function
+    prior_calls = [imm(program.code[a][1]) for a in program.functions[parser_function]
                    if a < root_object.args[2] and program.code[a][0] == 'bl']
     parser_context = []
     for target in dict.fromkeys(prior_calls):
@@ -522,7 +548,7 @@ def match_contract(slice_, invocation, function):
         if {'Unterminated string', 'Unexpected character'} <= literals:
             parser_context.append(hex(target))
     require(parser_context, 'JSON parser context not established')
-    return {'bindings': bindings, 'fixed_calls': [],
+    result = {'bindings': bindings, 'fixed_calls': [],
             'evidence': {'kind': 'conditional_static_consumer_contract', 'function': hex(function),
                          'parser_candidates': parser_context, 'byte_conversion': byte_evidence,
                          'materializer': hex(materializer), 'copy_function': hex(byte_array.fields['copy_function']),
@@ -532,12 +558,16 @@ def match_contract(slice_, invocation, function):
                                          'Standard Dart collection/decimal conversion and exported dartjni bridge semantics.',
                                          'JSON/request call context is available; exact network-body provenance is not proven.',
                                          'Offline inference does not establish runtime acceptance or execution.']}}
+    if slice_.boundary:
+        result['evidence']['preferences_boundary'] = slice_.boundary
+        result['evidence']['assumptions'].extend(slice_.boundary['assumptions'])
+    return result
 
 
-def recover_contract(program, function, accesses, bindings):
+def recover_contract(program, function, accesses, bindings, boundary=None):
     require(program.metadata.get('builtins') and program.metadata.get('stubs') and program.metadata.get('dispatch'),
             'metadata-exporting Blutter required (builtins, stubs and dispatch table)')
-    slice_ = Slice(program, bindings)
+    slice_ = Slice(program, bindings, boundary)
     slice_.run(function, accesses)
     findings = []; failures = []
     for event in slice_.events:
