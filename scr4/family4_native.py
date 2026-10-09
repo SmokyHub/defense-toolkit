@@ -327,6 +327,71 @@ def _local_argument(insns, at, register, pointer=False):
     return None
 
 
+def _reachable_code(img, start, budget=512):
+    """Follow bounded intraprocedural flow across shrink-wrapped prologues.
+
+    PAC instructions can occur after early returns, so they are not necessarily
+    function boundaries. Calls remain explicit and their callees are checked
+    separately. Never execute the library or follow indirect branches.
+    """
+    pending=[start];seen={}
+    while pending:
+        address=pending.pop()
+        if address in seen:continue
+        if len(seen)>=budget or not start<=address<start+32768:
+            raise Unsupported('bounded function flow exceeded')
+        i=img.byaddr.get(address)
+        if i is None:raise Unsupported('function flow reaches undecoded code')
+        seen[address]=i
+        if i.mnemonic=='ret':continue
+        if i.mnemonic in ('br','blr'):raise Unsupported('indirect helper flow')
+        if i.mnemonic=='b' or i.mnemonic.startswith('b.') or i.mnemonic in ('cbz','cbnz','tbz','tbnz'):
+            if not i.operands or i.operands[-1].type!=ARM64_OP_IMM:
+                raise Unsupported('unmodeled helper branch')
+            pending.append(i.operands[-1].imm)
+            if i.mnemonic=='b':continue
+        pending.append(address+4)
+    return [seen[a] for a in sorted(seen)]
+
+
+def _typed_call_shape(img, insns, helper_templates):
+    """Replace call addresses only after checking each complete callee body."""
+    rows=_shape(insns).splitlines();evidence=[]
+    for k,i in enumerate(insns):
+        if i.mnemonic!='bl':continue
+        target=i.operands[0].imm
+        try:body=_reachable_code(img,target,128)
+        except Unsupported:return None,[]
+        matches=[name for name,shape in helper_templates.items() if _shape(body)==shape]
+        if len(matches)!=1:return None,[]
+        rows[k]='bl '+matches[0]
+        evidence.append({'call_va':hex(i.address),'helper_va':hex(target),'role':matches[0]})
+    return '\n'.join(rows),evidence
+
+
+def _decimal_model(img, helper):
+    if not helper or helper[-1].mnemonic!='bl':return None
+    body=helper[:-1] # final stack-canary failure path, as in the existing model
+    if _shape(body)==DECIMAL_FORMAT_TEMPLATE:return 'multiply_decimal'
+    shape,_=_typed_call_shape(img,body,{'zero_buffer':ZERO_BUFFER_TEMPLATE})
+    if shape==DIVIDE_DECIMAL_TEMPLATE:return 'divide_decimal'
+    return None
+
+
+def _validator_model(img, guard):
+    graph=_validator_graph(_shape(guard))
+    if graph is not None and graph==_validator_graph(DEX_VALIDATOR_TEMPLATE):
+        return 'inline_section_checks',[]
+    try:body=_reachable_code(img,guard[0].address)
+    except Unsupported:return None,[]
+    shape,evidence=_typed_call_shape(img,body,{
+        'load_frame_arguments':DEX_FRAME_ARGUMENTS_TEMPLATE,
+        'check_dex_section':DEX_SECTION_TEMPLATE})
+    if shape==OUTLINED_DEX_VALIDATOR_TEMPLATE:
+        return 'outlined_section_checks',evidence
+    return None,[]
+
+
 def _decimal_calls(img, insns):
     """Recognize the complete bounded signed-decimal formatter, then its inputs."""
     for k,i in enumerate(insns):
@@ -337,11 +402,11 @@ def _decimal_calls(img, insns):
         buffer=_local_argument(insns,k,'x1',True)
         if value is None or not 0<=value<10**12 or size!=32 or buffer is None:continue
         helper=img.function(target)
-        # The sole trailing call is the stack-canary failure path. Its address
-        # has no effect on successful formatting; all other instructions match.
-        if not helper or helper[-1].mnemonic!='bl':continue
-        if _shape(helper[:-1])!=DECIMAL_FORMAT_TEMPLATE:continue
-        yield {'value':str(value),'selector_source':'constant_decimal_argument',
+        # The final call is the stack-canary failure path. Other calls must
+        # resolve to fully verified helpers; no arbitrary callees are ignored.
+        model=_decimal_model(img,helper)
+        if model is None:continue
+        yield {'value':str(value),'selector_source':'constant_decimal_argument','formatter_model':model,
                'format_call_va':hex(i.address),'helper_va':hex(target),'buffer':buffer,'index':k}
 
 
@@ -486,13 +551,14 @@ def extract_contract(img):
             # This is a semantic code-template match, not an APK/ELF identity test.
             # Constants and branch topology are deliberately retained: changed
             # validation behavior must require review, not inherit assumed bounds.
-            known_guard = _validator_graph(_shape(guard)) == _validator_graph(DEX_VALIDATOR_TEMPLATE)
-            known_guard = known_guard and _validator_graph(_shape(guard)) is not None
+            guard_model,guard_helpers=_validator_model(img,guard)
+            known_guard = guard_model is not None
             trigger_consistent=len(inline_selectors)==1 and inline_selectors[0]['value']==outer[0]
             candidates.append({'outer_key':outer[0], 'array_key':str(keys[arrayindex]),
                 'roles':{name:str(keys[index]) for name,index in bindings.items()},
                 'complete':known_guard and trigger_consistent, 'outer_trigger_evidence':inline_selectors, 'table_va':hex(va), 'parser_va':hex(start),
                 'loader_va':hex(loader[0].address), 'dex_validator_va':hex(guard[0].address),
+                'validator_model':guard_model,'validator_helpers':guard_helpers,
                 'role_evidence':[{'jni_slot':hex(s),'name_key':str(keys[a]),'signature_key':str(keys[b]),'call_va':hex(c)} for s,a,b,c in events],
                 'diagnostics':([] if known_guard else ['unmodeled_dex_validator'])+([] if trigger_consistent else ['outer_trigger_mismatch_or_ambiguous']),
                 'guards':{'dex_min_bytes':112,'dex_max_bytes':33554432,'dex_versions':['035','037','038','039','040','041'],'exact_file_size':True,'header_and_table_bounds':True,'dex_checksum_checked_by_native':False} if known_guard else None})
@@ -560,3 +626,15 @@ DEX_VALIDATOR_TEMPLATE = 'bti c\nmov w8, wzr\ncbz x0, @780\nmov x9, #-0x2000001\
 # Complete bounded decimal conversion helper; only the trailing canary-failure
 # call is excluded. The input value and buffer are recovered at each call site.
 DECIMAL_FORMAT_TEMPLATE = 'paciasp \nsub sp, sp, #0x30\nstp x29, x30, [sp, #0x20]\nmrs x9, tpidr_el0\nadd x29, sp, #0x20\nldr x10, [x9, #0x28]\nmov x8, x0\nmov w0, wzr\nstur x10, [x29, #-8]\ncbz x1, @232\ncbz x2, @232\ncmp x8, #0\nmov x12, #-0x3333333333333334\nmov x11, xzr\nmovk x12, #0xcccd\ncneg x15, x8, mi\nmov w13, #0xa\nmov x14, sp\nstp xzr, xzr, [sp]\nstr wzr, [sp, #0x10]\numulh x10, x15, x12\ncmp x15, #0xa\nlsr x16, x10, #3\nmsub w10, w16, w13, w15\norr w15, w10, #0x30\nadd x10, x11, #1\nstrb w15, [x14, x11]\nb.lo @128\ncmp x11, #0x13\nmov x15, x16\nmov x11, x10\nb.lo @80\nadd x11, x10, x8, lsr #63\ncmp x11, x2\ncset w0, lo\nb.hs @208\ntbnz x8, #0x3f, @156\nmov x8, xzr\nb @168\nmov w8, #0x2d\nstrb w8, [x1]\nmov w8, #1\nmov x11, sp\nsub x11, x11, #1\nldrb w12, [x11, x10]\nsubs x10, x10, #1\nstrb w12, [x1, x8]\nadd x8, x8, #1\nb.ne @176\nstrb wzr, [x1, x8]\ncbz x3, @208\nstr x8, [x3]\nmov x8, xzr\nmov x10, sp\nstrb wzr, [x10, x8]\nadd x8, x8, #1\ncmp x8, #0x14\nb.ne @216\nldr x8, [x9, #0x28]\nldur x9, [x29, #-8]\ncmp x8, x9\nb.ne @264\nldp x29, x30, [sp, #0x20]\nadd sp, sp, #0x30\nautiasp \nret '
+
+# Reviewed compact-code templates: see the Reasonglow Family4 variant report.
+# Call targets are replaced by roles only after their full bodies match.
+ZERO_BUFFER_TEMPLATE = 'bti c\ncbz x1, @20\nsub x1, x1, #1\nstrb wzr, [x0], #1\ncbnz x1, @8\nret '
+
+DEX_FRAME_ARGUMENTS_TEMPLATE = 'ldr x0, [sp]\nldur x3, [x29, #-8]\nret '
+
+DEX_SECTION_TEMPLATE = 'bti c\nadd x9, x0, x1\nldp w8, w9, [x9]\ncbz w8, @36\ncmp x4, x9\nccmp x3, x9, #0, ls\nb.hs @48\nmov w0, wzr\nret \ncmp w9, #0\ncset w0, eq\nret \nsub w9, w3, w9\nudiv w9, w9, w2\ncmp w9, w8\ncset w0, hs\nret '
+
+OUTLINED_DEX_VALIDATOR_TEMPLATE = 'bti c\nmov w8, wzr\ncbz x0, @140\nmov x9, #-0x2000001\nmov x10, #-0xff91\nadd x9, x1, x9\nmovk x10, #0xfe00, lsl #16\ncmp x9, x10\nb.lo @140\nldrb w8, [x0]\ncmp w8, #0x64\nb.ne @136\nldrb w8, [x0, #1]\ncmp w8, #0x65\nb.ne @136\nldrb w8, [x0, #2]\ncmp w8, #0x78\nb.ne @136\nldrb w8, [x0, #3]\ncmp w8, #0xa\nb.ne @136\nldrb w8, [x0, #4]\ncmp w8, #0x30\nb.ne @136\nldrb w8, [x0, #5]\nsub w9, w8, #0x3a\ncmn w9, #0xa\nb.lo @136\nldrb w9, [x0, #6]\nsub w10, w9, #0x3a\ncmn w10, #0xa\nb.lo @136\nldrb w10, [x0, #7]\ncbz w10, @148\nmov w8, wzr\nmov w0, w8\nret \nmov w10, #0xa\nmadd w9, w8, w10, w9\nsub w8, w9, #0x23a\ncmn w8, #7\nmov w8, wzr\nb.lo @140\nsub w9, w9, #0x210\ncmp w9, #0x24\nb.eq @140\ncmp w9, #0x29\nmov w8, #0x70\nmov w10, #0x78\ncsel x8, x10, x8, eq\ncmp x1, x8\nb.lo @136\nldr w10, [x0, #0x24]\ncmp x8, x10\nb.ne @136\nldr w10, [x0, #0x20]\nldr w11, [x0, #0x28]\nmov w12, #0x5678\nmovk w12, #0x1234, lsl #16\ncmp x1, x10\nccmp w11, w12, #0, hs\nccmp x8, x10, #2, eq\nb.hi @136\npaciasp \nsub sp, sp, #0x30\nstp x29, x30, [sp, #0x20]\nadd x29, sp, #0x20\ncmp w9, #0x29\nstr x8, [sp, #0x10]\nstr w9, [sp, #0xc]\nstur x1, [x29, #-8]\nb.ne @316\nldr w9, [x0, #0x70]\ncmp x1, x9\nb.ne @652\nldr w9, [x0, #0x74]\nmov x8, x0\ncbz w9, @328\nb @652\nmov x8, x0\ncmp x1, x10\nb.ne @652\nstr x8, [sp]\nldp w9, w8, [x8, #0x2c]\ncbz w9, @372\nldr x10, [sp, #0x10]\ncmp x10, x8\nldur x10, [x29, #-8]\nsub w11, w10, w8\nccmp x10, x8, #0, ls\nccmp w11, w9, #0, hs\nb.hs @376\nb @652\ncbnz w8, @652\nbl load_frame_arguments\nmov w1, #0x38\nldr x4, [sp, #0x10]\nmov w2, #4\nbl check_dex_section\ntbz w0, #0, @652\nbl load_frame_arguments\nmov w1, #0x40\nldr x4, [sp, #0x10]\nmov w2, #4\nbl check_dex_section\ntbz w0, #0, @652\nbl load_frame_arguments\nmov w1, #0x48\nldr x4, [sp, #0x10]\nmov w2, #0xc\nbl check_dex_section\ntbz w0, #0, @652\nbl load_frame_arguments\nmov w1, #0x50\nldr x4, [sp, #0x10]\nmov w2, #8\nbl check_dex_section\ntbz w0, #0, @652\nbl load_frame_arguments\nmov w1, #0x58\nldr x4, [sp, #0x10]\nmov w2, #8\nbl check_dex_section\ntbz w0, #0, @652\nbl load_frame_arguments\nmov w1, #0x60\nldr x4, [sp, #0x10]\nmov w2, #0x20\nbl check_dex_section\ntbz w0, #0, @652\nldr w8, [sp, #0xc]\ncmp w8, #0x29\nb.eq @576\nldr x8, [sp]\nldp w9, w8, [x8, #0x68]\ncbz w9, @572\nldur x10, [x29, #-8]\ncmp w8, #0x70\nsub w11, w10, w8\nccmp x10, x8, #0, hs\nccmp w11, w9, #0, hs\nb.hs @576\nb @652\ncbnz w8, @652\nldr x8, [sp]\nldr w8, [x8, #0x34]\ncbz w8, @672\nldr x9, [sp, #0x10]\ncmp x9, x8\nldur x9, [x29, #-8]\nccmp x9, x8, #0, ls\nb.lo @652\nldur x9, [x29, #-8]\nsub x9, x9, x8\ncmp x9, #4\nb.lo @652\nsub w9, w9, #4\nmov w10, #0xc\nudiv w10, w9, w10\nldr x9, [sp]\nldr w8, [x9, x8]\ncmp w10, w8\nb.hs @672\nmov w8, wzr\nldp x29, x30, [sp, #0x20]\nadd sp, sp, #0x30\nautiasp \nb @140\nmov w8, #1\nb @656'
+
+DIVIDE_DECIMAL_TEMPLATE = 'paciasp \nsub sp, sp, #0x40\nstp x29, x30, [sp, #0x20]\nadd x29, sp, #0x20\nstp x20, x19, [sp, #0x30]\nmrs x20, tpidr_el0\nmov w19, wzr\nldr x8, [x20, #0x28]\nstur x8, [x29, #-8]\ncbz x1, @208\ncbz x2, @208\ncmp x0, #0\nmov x8, xzr\nmov w9, #0xa\ncneg x11, x0, mi\nmov x10, sp\nstp xzr, xzr, [sp]\nstr wzr, [sp, #0x10]\nudiv x12, x11, x9\ncmp x11, #0xa\nccmp x8, #0x13, #2, hs\nmsub w13, w12, w9, w11\norr w11, w13, #0x30\nstrb w11, [x10, x8]\nadd x8, x8, #1\nmov x11, x12\nb.lo @72\nadd x9, x8, x0, lsr #63\ncmp x9, x2\ncset w19, lo\nb.hs @196\ntbnz x0, #0x3f, @136\nmov x9, xzr\nb @148\nmov w9, #0x2d\nstrb w9, [x1]\nmov w9, #1\nmov x10, sp\nsub x10, x10, #1\ncbz x8, @184\nldrb w11, [x10, x8]\nadd x12, x9, #1\nsub x8, x8, #1\nstrb w11, [x1, x9]\nmov x9, x12\ncbnz x8, @160\nstrb wzr, [x1, x9]\ncbz x3, @196\nstr x9, [x3]\nmov x0, sp\nmov w1, #0x14\nbl zero_buffer\nldr x8, [x20, #0x28]\nldur x9, [x29, #-8]\ncmp x8, x9\nb.ne @248\nmov w0, w19\nldp x20, x19, [sp, #0x30]\nldp x29, x30, [sp, #0x20]\nadd sp, sp, #0x40\nautiasp \nret '

@@ -1,4 +1,0 @@
-https://dev.fest-drift.com/remote-config
-dev.fest-drift.com
-https://proofharbor.android-app-api.com/public/v5/kr
-proofharbor.android-app-api.com
