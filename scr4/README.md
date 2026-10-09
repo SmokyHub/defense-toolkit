@@ -23,7 +23,7 @@ status. The native analysis does not depend on the library's filename.
 - Both outputs must be new files. Ambiguous or unsupported inputs retain analysis
   diagnostics but do not generate a guessed proof response (exit status 2 if requested).
 
-For the tested 5555xBasin app, configure an **exact POST URL** breakpoint in HTTP Toolkit
+For the tested 5555xBasin and 5555xLat apps, configure an **exact POST URL** breakpoint in HTTP Toolkit
 using the endpoint recovered in your report. At the app's request, choose **Respond
 directly**, paste `ready-response.json`, and return HTTP 200 with `Content-Type:
 application/json`. Set Content-Length to the UTF-8 byte length if entering it manually.
@@ -42,7 +42,8 @@ proof. The benign entry loads local HTML and makes no network request.
 
 The Python reader decodes distributed encrypted string descriptors from the ELF,
 finds the native selector table, and associates fields with JNI name/signature arguments.
-It checks the recognized validator's instruction/branch structure. It does not select
+It recognizes inline or bounded decimal-formatted outer selectors and checks the
+validator's instruction graph, including equivalent shared-return layouts. It does not select
 an app by SHA-256, package, library name, endpoint or stored response pack.
 
 The tested native validator requires 112–33,554,432 decoded bytes, supported DEX magic,
@@ -53,7 +54,7 @@ runtime; the valid bundled DEX executed. There is **no separate JSON expected-si
 Recognition is deliberately conservative. Tests cover changed numeric selectors, a changed
 outer selector, encrypted endpoint changes, relocated ELF addresses and changed JNI call
 arguments. Unknown compiler layouts, outer-selector forms, decoding schemes or validator
-changes can require review. One real app has been validated; synthetic variants are not
+changes can require review. Two real apps have been validated; synthetic variants are not
 additional observed family members. This flags a remote-code loading capability, not
 malicious intent or common ownership by itself.
 

@@ -261,6 +261,123 @@ def _shape(insns):
 
 
 
+def _validator_graph(shape):
+    """Compare acyclic validator control flow, independent of shared return layout.
+
+    Preserve every nonterminal instruction and branch predicate. Only fold direct
+    jumps and the two equivalent zero-return sequences, and normalize condition
+    inverses. This is not a byte hash or a relaxed search for a few guard constants.
+    """
+    rows=shape.splitlines()
+    if not 1 <= len(rows) <= 512:
+        return None
+    memo={}; active=set()
+    inverses={'b.lo':'b.hs','b.hi':'b.ls','b.ne':'b.eq','b.lt':'b.ge',
+              'b.gt':'b.le','cbnz':'cbz','tbnz':'tbz'}
+    def visit(k):
+        if k in memo:return memo[k]
+        if k in active or not 0<=k<len(rows):raise Unsupported('cyclic or external validator branch')
+        active.add(k)
+        if rows[k:k+2]==['mov w0, wzr','ret ']:
+            node=('return_zero',)
+        elif rows[k:k+3]==['mov w8, wzr','mov w0, w8','ret ']:
+            node=('return_zero',)
+        elif rows[k:k+2]==['mov w0, w8','ret ']:
+            node=('return_w8',)
+        else:
+            op,_,args=rows[k].partition(' ')
+            branch=re.fullmatch(r'(.*)@(-?\d+)',args)
+            if branch:
+                address=int(branch[2])
+                if address%4:raise Unsupported('unaligned validator branch')
+                yes=visit(address//4)
+                if op=='b':
+                    active.remove(k);memo[k]=yes;return yes
+                if not (op.startswith('b.') or op in ('cbz','cbnz','tbz','tbnz')):
+                    raise Unsupported('unmodeled validator branch')
+                no=visit(k+1)
+                if op in inverses:op=inverses[op];yes,no=no,yes
+                node=(op,branch[1],yes,no)
+            else:
+                if op in ('ret','br','blr','bl'):raise Unsupported('unmodeled validator terminal')
+                node=(rows[k],visit(k+1))
+        # Hash-cons the instruction graph, not the sample; bounded shared tails
+        # avoid exponentially expanding the many converging validation branches.
+        result=hashlib.sha256(repr(node).encode()).hexdigest()
+        memo[k]=result;active.remove(k);return result
+    try:return visit(0)
+    except (Unsupported,RecursionError):return None
+
+
+def _local_argument(insns, at, register, pointer=False):
+    """Bounded argument slice for immediate integers or frame-relative buffers."""
+    for k in range(at-1,max(-1,at-24),-1):
+        i=insns[k];ops=i.operands
+        if i.mnemonic in ('bl','blr') and register in {f'x{x}' for x in range(19)}:return None
+        if not ops or _reg(i,ops[0])!=register:continue
+        if i.mnemonic in ('cmp','cmn','tst','str','stur','stp','strb','strh','sturh','cbz','cbnz','tbz','tbnz'):continue
+        if i.mnemonic=='mov' and len(ops)==2:
+            if ops[1].type==ARM64_OP_REG:
+                register=_reg(i,ops[1]);continue
+            if not pointer and ops[1].type==ARM64_OP_IMM:return ops[1].imm
+        if pointer and i.mnemonic in ('add','sub') and len(ops)==3 and ops[2].type==ARM64_OP_IMM:
+            base=_reg(i,ops[1])
+            if base in ('sp','fp','x29'):return (base,ops[2].imm*(1 if i.mnemonic=='add' else -1))
+        return None
+    return None
+
+
+def _decimal_calls(img, insns):
+    """Recognize the complete bounded signed-decimal formatter, then its inputs."""
+    for k,i in enumerate(insns):
+        if i.mnemonic!='bl':continue
+        target=i.operands[0].imm
+        value=_local_argument(insns,k,'x0')
+        size=_local_argument(insns,k,'x2')
+        buffer=_local_argument(insns,k,'x1',True)
+        if value is None or not 0<=value<10**12 or size!=32 or buffer is None:continue
+        helper=img.function(target)
+        # The sole trailing call is the stack-canary failure path. Its address
+        # has no effect on successful formatting; all other instructions match.
+        if not helper or helper[-1].mnemonic!='bl':continue
+        if _shape(helper[:-1])!=DECIMAL_FORMAT_TEMPLATE:continue
+        yield {'value':str(value),'selector_source':'constant_decimal_argument',
+               'format_call_va':hex(i.address),'helper_va':hex(target),'buffer':buffer,'index':k}
+
+
+def _formatted_numeric_selectors(img):
+    found=[]
+    for start in img.starts:
+        f=img.function(start)
+        for item in _decimal_calls(img,f):
+            for j in range(item['index']+1,min(item['index']+16,len(f))):
+                if _jni_slot(f,j)==0x538 and _local_argument(f,j,'x1',True)==item['buffer']:
+                    found.append({k:v for k,v in item.items() if k not in ('index','buffer') } | {'jni_call_va':hex(f[j].address)})
+                    break
+                if f[j].mnemonic in ('bl','blr'):break
+    return found
+
+
+def _array_skip(parser,index):
+    # Older code compares a field index; newer code iterates 16-byte records.
+    for k,i in enumerate(parser[:-1]):
+        if i.mnemonic!='cmp' or i.operands[-1].type!=ARM64_OP_IMM or parser[k+1].mnemonic!='b.eq':continue
+        value=i.operands[-1].imm
+        if value==index:return True
+        if value!=index*16:continue
+        reg=_reg(i,i.operands[0]);target=parser[k+1].operands[0].imm
+        tail=next((j for j,x in enumerate(parser) if x.address==target),None)
+        if tail is None:continue
+        x=parser[tail]
+        if x.mnemonic!='add' or x.op_str!=f'{reg}, {reg}, #0x10':continue
+        if not any(y.mnemonic=='cmp' and _reg(y,y.operands[0])==reg and y.operands[-1].type==ARM64_OP_IMM and y.operands[-1].imm==15*16 for y in parser[tail+1:tail+5]):continue
+        # The skipped record must be stored as pointer+length at context+index+40.
+        body=parser[k+2:tail]
+        if any(y.mnemonic=='add' and len(y.operands)==3 and _reg(y,y.operands[2])==reg and any(z.mnemonic=='stp' and z.operands[-1].type==ARM64_OP_MEM and z.reg_name(z.operands[-1].mem.base)==_reg(y,y.operands[0]) and z.operands[-1].mem.disp==40 for z in body[j+1:j+5]) for j,y in enumerate(body)):
+            return True
+    return False
+
+
 def _inline_numeric_selectors(img):
     selectors=[]
     for start in img.starts:
@@ -289,7 +406,7 @@ def _inline_numeric_selectors(img):
 
 def extract_contract(img):
     candidates=[]
-    inline_selectors=_inline_numeric_selectors(img)
+    inline_selectors=_inline_numeric_selectors(img)+_formatted_numeric_selectors(img)
     for k,va in _address_refs(img.ins):
         try:
             keys=struct.unpack('<15Q',img.read(va,120))
@@ -300,7 +417,8 @@ def extract_contract(img):
         parser=img.function(img.ins[k].address)
         if not any(i.mnemonic=='cmp' and i.operands[-1].type==ARM64_OP_IMM and i.operands[-1].imm==15 for i in parser):
             continue
-        outer=[]
+        formatted=list(_decimal_calls(img,parser))
+        outer=[x['value'] for x in formatted]
         for j,i in enumerate(parser[:-1]):
             if i.mnemonic=='mov' and i.operands[-1].type==ARM64_OP_IMM:
                 val=i.operands[-1].imm
@@ -357,7 +475,7 @@ def extract_contract(img):
             remaining=set(range(15))-set(bindings.values())
             if len(set(bindings.values()))!=14 or len(remaining)!=1:continue
             arrayindex=remaining.pop()
-            if not any(i.mnemonic=='cmp' and i.operands[-1].type==ARM64_OP_IMM and i.operands[-1].imm==arrayindex and parser[z+1].mnemonic=='b.eq' for z,i in enumerate(parser[:-1])):continue
+            if not _array_skip(parser,arrayindex):continue
             guard=None
             for j in range(pos+1,min(pos+35,len(loader))):
                 i=loader[j]
@@ -368,7 +486,8 @@ def extract_contract(img):
             # This is a semantic code-template match, not an APK/ELF identity test.
             # Constants and branch topology are deliberately retained: changed
             # validation behavior must require review, not inherit assumed bounds.
-            known_guard = _shape(guard)==DEX_VALIDATOR_TEMPLATE
+            known_guard = _validator_graph(_shape(guard)) == _validator_graph(DEX_VALIDATOR_TEMPLATE)
+            known_guard = known_guard and _validator_graph(_shape(guard)) is not None
             trigger_consistent=len(inline_selectors)==1 and inline_selectors[0]['value']==outer[0]
             candidates.append({'outer_key':outer[0], 'array_key':str(keys[arrayindex]),
                 'roles':{name:str(keys[index]) for name,index in bindings.items()},
@@ -437,3 +556,7 @@ def analyze_bytes(data):
 # Populated below with an instruction-level validator template, independent of
 # app identity, addresses, keys, endpoint, split name, and descriptor secrets.
 DEX_VALIDATOR_TEMPLATE = 'bti c\nmov w8, wzr\ncbz x0, @780\nmov x9, #-0x2000001\nmov x10, #-0xff91\nadd x9, x1, x9\nmovk x10, #0xfe00, lsl #16\ncmp x9, x10\nb.lo @780\nldrb w8, [x0]\ncmp w8, #0x64\nb.ne @136\nldrb w8, [x0, #1]\ncmp w8, #0x65\nb.ne @136\nldrb w8, [x0, #2]\ncmp w8, #0x78\nb.ne @136\nldrb w8, [x0, #3]\ncmp w8, #0xa\nb.ne @136\nldrb w8, [x0, #4]\ncmp w8, #0x30\nb.ne @136\nldrb w8, [x0, #5]\nsub w9, w8, #0x3a\ncmn w9, #0xa\nb.lo @136\nldrb w9, [x0, #6]\nsub w10, w9, #0x3a\ncmn w10, #0xa\nb.lo @136\nldrb w10, [x0, #7]\ncbz w10, @144\nmov w0, wzr\nret \nmov w10, #0xa\nmadd w9, w8, w10, w9\nsub w8, w9, #0x23a\ncmn w8, #7\nmov w8, wzr\nb.lo @780\nsub w10, w9, #0x210\ncmp w10, #0x24\nb.eq @780\ncmp w10, #0x29\nmov w8, #0x70\nmov w9, #0x78\ncsel x9, x9, x8, eq\ncmp x1, x9\nb.lo @136\nldr w8, [x0, #0x24]\ncmp x9, x8\nb.ne @136\nldr w11, [x0, #0x20]\nmov w8, wzr\ncmp x1, x11\nb.lo @780\nldr w12, [x0, #0x28]\nmov w13, #0x5678\nmovk w13, #0x1234, lsl #16\ncmp w12, w13\nb.ne @780\ncmp x9, x11\nb.hi @780\ncmp w10, #0x29\nb.ne @292\nldr w8, [x0, #0x70]\ncmp x1, x8\nb.ne @136\nldr w8, [x0, #0x74]\ncbnz w8, @136\nb @300\ncmp x1, x11\nb.ne @136\nldp w12, w11, [x0, #0x2c]\ncbz w12, @344\ncmp x9, x11\nmov w8, wzr\nb.hi @780\ncmp x1, x11\nb.lo @780\nsub w11, w1, w11\ncmp w11, w12\nb.hs @348\nb @780\ncbnz w11, @136\nldp w12, w11, [x0, #0x38]\ncbz w12, @392\ncmp x9, x11\nmov w8, wzr\nb.hi @780\ncmp x1, x11\nb.lo @780\nsub w8, w1, w11\ncmp w12, w8, lsr #2\nb.hi @136\nb @396\ncbnz w11, @136\nldp w12, w11, [x0, #0x40]\ncbz w12, @440\ncmp x9, x11\nmov w8, wzr\nb.hi @780\ncmp x1, x11\nb.lo @780\nsub w8, w1, w11\ncmp w12, w8, lsr #2\nb.hi @136\nb @444\ncbnz w11, @136\nldp w11, w12, [x0, #0x48]\ncbz w11, @504\ncmp x9, x12\nmov w8, wzr\nb.hi @780\ncmp x1, x12\nb.lo @780\nsub w8, w1, w12\nmov w12, #0xaaab\nmovk w12, #0xaaaa, lsl #16\numull x8, w8, w12\nlsr x8, x8, #0x23\ncmp w8, w11\nb.lo @136\nb @508\ncbnz w12, @136\nldp w12, w11, [x0, #0x50]\ncbz w12, @552\ncmp x9, x11\nmov w8, wzr\nb.hi @780\ncmp x1, x11\nb.lo @780\nsub w8, w1, w11\ncmp w12, w8, lsr #3\nb.hi @136\nb @556\ncbnz w11, @136\nldp w12, w11, [x0, #0x58]\ncbz w12, @600\ncmp x9, x11\nmov w8, wzr\nb.hi @780\ncmp x1, x11\nb.lo @780\nsub w8, w1, w11\ncmp w12, w8, lsr #3\nb.hi @136\nb @604\ncbnz w11, @136\nldp w12, w11, [x0, #0x60]\ncbz w12, @648\ncmp x9, x11\nmov w8, wzr\nb.hi @780\ncmp x1, x11\nb.lo @780\nsub w8, w1, w11\ncmp w12, w8, lsr #5\nb.hi @136\nb @652\ncbnz w11, @136\ncmp w10, #0x29\nb.eq @708\nldp w11, w10, [x0, #0x68]\ncbz w11, @704\ncmp w10, #0x70\nmov w8, wzr\nb.lo @780\ncmp x1, x10\nb.lo @780\nsub w10, w1, w10\ncmp w10, w11\nb.hs @708\nb @780\ncbnz w10, @136\nldr w10, [x0, #0x34]\ncbz w10, @776\ncmp x9, x10\nmov w8, wzr\nb.hi @780\nsubs x9, x1, x10\nb.lo @780\ncmp x9, #4\nb.lo @136\nsub w8, w9, #4\nmov w9, #0xaaab\nmovk w9, #0xaaaa, lsl #16\numull x8, w8, w9\nldr w9, [x0, x10]\nlsr x8, x8, #0x23\ncmp w8, w9\nb.lo @136\nmov w8, #1\nmov w0, w8\nret '
+
+# Complete bounded decimal conversion helper; only the trailing canary-failure
+# call is excluded. The input value and buffer are recovered at each call site.
+DECIMAL_FORMAT_TEMPLATE = 'paciasp \nsub sp, sp, #0x30\nstp x29, x30, [sp, #0x20]\nmrs x9, tpidr_el0\nadd x29, sp, #0x20\nldr x10, [x9, #0x28]\nmov x8, x0\nmov w0, wzr\nstur x10, [x29, #-8]\ncbz x1, @232\ncbz x2, @232\ncmp x8, #0\nmov x12, #-0x3333333333333334\nmov x11, xzr\nmovk x12, #0xcccd\ncneg x15, x8, mi\nmov w13, #0xa\nmov x14, sp\nstp xzr, xzr, [sp]\nstr wzr, [sp, #0x10]\numulh x10, x15, x12\ncmp x15, #0xa\nlsr x16, x10, #3\nmsub w10, w16, w13, w15\norr w15, w10, #0x30\nadd x10, x11, #1\nstrb w15, [x14, x11]\nb.lo @128\ncmp x11, #0x13\nmov x15, x16\nmov x11, x10\nb.lo @80\nadd x11, x10, x8, lsr #63\ncmp x11, x2\ncset w0, lo\nb.hs @208\ntbnz x8, #0x3f, @156\nmov x8, xzr\nb @168\nmov w8, #0x2d\nstrb w8, [x1]\nmov w8, #1\nmov x11, sp\nsub x11, x11, #1\nldrb w12, [x11, x10]\nsubs x10, x10, #1\nstrb w12, [x1, x8]\nadd x8, x8, #1\nb.ne @176\nstrb wzr, [x1, x8]\ncbz x3, @208\nstr x8, [x3]\nmov x8, xzr\nmov x10, sp\nstrb wzr, [x10, x8]\nadd x8, x8, #1\ncmp x8, #0x14\nb.ne @216\nldr x8, [x9, #0x28]\nldur x9, [x29, #-8]\ncmp x8, x9\nb.ne @264\nldp x29, x30, [sp, #0x20]\nadd sp, sp, #0x30\nautiasp \nret '

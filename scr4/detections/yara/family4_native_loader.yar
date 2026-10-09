@@ -6,7 +6,8 @@
 // SplitMix constants and DEX validation each have legitimate uses; require both exact
 // implementation sequences plus JNI. This is a review signal, not a malware verdict.
 // Compiler/register changes and changed limits can evade this deliberately narrow rule.
-// Branch displacement bytes alone are wildcarded; only one original build is available.
+// Branch displacement bytes alone are wildcarded. A second original build also matched;
+// see reports/family4/io.tracelatticeglow.proofharbor/02_variant_analysis.md.
 rule SUSP_Android_Family4_Arm64NativeLoader_Oct26 {
   meta:
     author      = "APK Defense Lab"

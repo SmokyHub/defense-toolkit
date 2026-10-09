@@ -1,4 +1,4 @@
-# Family4 — 5555xBasin
+# Family4 — native JSON-to-DEX loaders
 
 The saved app `dev.tracebasinmoss.routepearl` v1.0.5 can receive a JSON response,
 validate embedded DEX bytes, and invoke a response-selected instance method with
@@ -57,7 +57,10 @@ Evidence:
 - [Detection validation](dev.tracebasinmoss.routepearl/04_detection_report.md)
 - [Runtime and script validation](dev.tracebasinmoss.routepearl/05_validation.md)
 
-One original app has been analyzed; synthetic mutations demonstrate bounded
+Two original apps have been analyzed and tested on the Pixel. The second is
+[5555xLat / Proofharbor](io.tracelatticeglow.proofharbor/02_variant_analysis.md),
+which exposed decimal-selector and validator-layout coverage gaps now repaired.
+Synthetic mutations demonstrate bounded
 variation coverage. Remote loading alone does not establish malicious intent,
 common operators or the behavior of an unseen production payload. This experiment
 supplied a benign response locally and did not retrieve a production DEX.
