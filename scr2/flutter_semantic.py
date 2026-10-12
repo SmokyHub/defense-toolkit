@@ -2,7 +2,7 @@
 """Bounded offline AArch64 Flutter discovery. Never executes submitted code.
 
 Native Blutter is selected by snapshot format and host compatibility. A bounded
-Python reader supports the documented older format without compiling a VM. Neither
+Python reader supports the reviewed snapshot formats without compiling a VM. Neither
 path selects application hashes or downloads per-application profiles.
 Incomplete consumer contracts remain evidence for review. Supported contracts
 retain conditional-path and library-semantic assumptions explicitly.
@@ -653,9 +653,72 @@ def load_snapshot(libapp, data, identity, directory=None, executable=None, reade
         return pool, toolchain, metadata
     if reader not in ('auto', 'blutter'):
         raise Unsupported('Unknown Flutter snapshot reader')
-    pool, analyzer, metadata = recover_pool(libapp, identity, directory, executable)
+    try:
+        pool, analyzer, metadata = recover_pool(libapp, identity, directory, executable)
+        if metadata is None and reader == 'auto' and supports(identity):
+            raise Unsupported('Native reader produced no semantic metadata')
+        pool = parse_pool(pool)
+    except (OSError, ValueError, ELFError, subprocess.TimeoutExpired) as error:
+        # A matching installed VM can still fail to start or lack semantic
+        # metadata. Auto mode may use the independently checked Python schema;
+        # explicit native mode and unknown formats retain the original failure.
+        if reader != 'auto' or not supports(identity):
+            raise
+        try:
+            pool, analyzer, metadata = load_snapshot(libapp, data, identity, reader='python')
+        except (OSError, ValueError, ELFError) as python_error:
+            raise Unsupported(f'Native snapshot reader failed: {error}; Python snapshot reader failed: {python_error}') from python_error
+        analyzer['native_reader_diagnostic'] = str(error)
+        return pool, analyzer, metadata
     analyzer['reader'] = 'blutter'
-    return parse_pool(pool), analyzer, metadata
+    return pool, analyzer, metadata
+
+
+def analyze_input(libapp, bridge=None, directory=None, executable=None, reader='auto', after_metadata=None):
+    """Preserve the failed stage and snapshot identity for unsupported inputs."""
+    from dart_snapshot_schema import SCHEMAS
+    stages = []
+    identity = None
+    analyzer = None
+    def begin(name):
+        stages.append({'stage': name, 'status': 'unresolved'})
+    def complete():
+        stages[-1]['status'] = 'complete'
+    try:
+        begin('input_read')
+        data = read_bounded(libapp, MAX_ELF)
+        complete()
+        begin('snapshot_identity')
+        identity = snapshot_identity(data)
+        complete()
+        begin('snapshot_metadata')
+        pool, analyzer, metadata = load_snapshot(libapp, data, identity, directory, executable, reader)
+        complete()
+        if after_metadata is not None:
+            begin('analysis_resource_limits')
+            after_metadata()
+            complete()
+        begin('bridge_read')
+        bridge_data = read_bounded(bridge, MAX_ELF) if bridge else None
+        complete()
+        if bridge is None:
+            stages[-1]['status'] = 'not_supplied'
+        begin('consumer_contract')
+        result = discover(data, pool, bridge_data, metadata)
+        stages[-1]['status'] = 'conditional_contract_recovered' if result['findings'] else 'needs_review'
+    except (OSError, ValueError, ELFError, subprocess.TimeoutExpired) as error:
+        stages[-1].update(status='failed', diagnostic=str(error))
+        result = {'findings': [], 'candidates': [], 'diagnostics': [f'flutter_analysis_unavailable: {error}']}
+    result['analysis_stages'] = stages
+    if identity is not None:
+        result['snapshot_compatibility'] = {
+            **identity, 'python_format_registered': identity['snapshot_hash'] in SCHEMAS,
+            'supported_python_formats': [{'snapshot_hash': s.snapshot_hash, 'dart_version': s.dart_version}
+                                         for s in SCHEMAS.values()],
+            'limitation': 'A registered format still requires valid feature flags, structure and a supported consumer flow.'}
+    if analyzer is not None:
+        result['toolchain'] = analyzer
+    return result
 
 
 def main():
@@ -677,14 +740,11 @@ def main():
             # Dart 3.12 reserves 32 GiB guards on each side of a 4 GiB heap,
             # plus alignment. This limits virtual addresses, not resident RAM.
             resource.setrlimit(resource.RLIMIT_AS, (96 * 1024**3, 96 * 1024**3))
-        data = read_bounded(args.libapp, MAX_ELF)
-        identity = snapshot_identity(data)
-        pool, analyzer, metadata = load_snapshot(args.libapp, data, identity, args.blutter_dir,
-                                                args.blutter_bin, args.flutter_reader)
-        if os.uname().sysname == 'Linux':
-            resource.setrlimit(resource.RLIMIT_AS, (4 * 1024**3, 96 * 1024**3))
-        result = discover(data, pool, read_bounded(args.bridge, MAX_ELF) if args.bridge else None, metadata)
-        result['toolchain'] = analyzer
+        def limit_analysis_memory():
+            if os.uname().sysname == 'Linux':
+                resource.setrlimit(resource.RLIMIT_AS, (4 * 1024**3, 96 * 1024**3))
+        result = analyze_input(args.libapp, args.bridge, args.blutter_dir, args.blutter_bin,
+                               args.flutter_reader, after_metadata=limit_analysis_memory)
     except (OSError, ValueError, ELFError, subprocess.TimeoutExpired) as error:
         result = {'findings': [], 'candidates': [], 'diagnostics': [f'flutter_analysis_unavailable: {error}']}
     print(json.dumps(result))

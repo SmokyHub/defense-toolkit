@@ -22,6 +22,13 @@ MASK = (1 << 64) - 1
 class Unsupported(ValueError):
     pass
 
+class Code(tuple):
+    """Immutable instruction sequence with reusable control-flow boundaries."""
+    def __new__(cls, instructions):
+        value = super().__new__(cls, instructions)
+        value.slice_leaders = None
+        return value
+
 class Image:
     def __init__(self, data):
         if not isinstance(data, bytes) or not 64 <= len(data) <= 32 * 1024 * 1024:
@@ -67,10 +74,22 @@ class Image:
                     raise Unsupported('executable code budget exceeded')
                 self.ins.extend(md.disasm(s.data(), s['sh_addr']))
         self.ins.sort(key=lambda i:i.address)
+        self.ins = Code(self.ins)
         valid_addresses = {i.address for i in self.ins}
         if len(valid_addresses) != len(self.ins):
             raise Unsupported('overlapping executable sections')
         self.starts = sorted({i.address for k,i in enumerate(self.ins) if i.mnemonic=='bti' and i.op_str=='c' or i.mnemonic in ('paciasp','pacibsp') and not any(x.mnemonic=='bti' for x in self.ins[max(0,k-8):k])} | {i.operands[0].imm for i in self.ins if i.mnemonic=='bl' and i.operands[0].imm in valid_addresses})
+        # Exported or retained function symbols also identify leaf functions
+        # without BTI/PAC prologues or in-image direct callers.
+        symbols = set()
+        for sec in self.elf.iter_sections():
+            if sec['sh_type'] in ('SHT_SYMTAB', 'SHT_DYNSYM'):
+                if sec.num_symbols() > 131072:
+                    raise Unsupported('function symbol budget exceeded')
+                symbols.update(s['st_value'] for s in sec.iter_symbols()
+                               if s['st_info']['type'] == 'STT_FUNC' and s['st_shndx'] != 'SHN_UNDEF'
+                               and s['st_value'] in valid_addresses)
+        self.starts = sorted(set(self.starts) | symbols)
         self.byaddr = {i.address:i for i in self.ins}
         self._functions = {}
         if not self.starts:
@@ -99,7 +118,7 @@ class Image:
         if end-self.starts[k] > 65536:
             raise Unsupported('function span exceeds analysis budget')
         if self.starts[k] not in self._functions:
-            self._functions[self.starts[k]] = [self.byaddr[a] for a in range(self.starts[k], end, 4) if a in self.byaddr]
+            self._functions[self.starts[k]] = Code(self.byaddr[a] for a in range(self.starts[k], end, 4) if a in self.byaddr)
         return self._functions[self.starts[k]]
 
 
@@ -169,32 +188,162 @@ def _reg(ins, op):
     return ins.reg_name(op.reg).replace('w', 'x', 1) if op.type == ARM64_OP_REG else None
 
 
-def _stack_source(insns, at, register, depth=0):
-    """Local backward slice; values crossing calls/unsupported writes are unknown."""
-    if depth > 8:
+class ArgumentSlice:
+    """Bounded basic-block values; no execution or assumed identity for calls.
+
+    Preserve widths, track frame aliases and exact stack spills, and stop at
+    control transfers, unknown writes or possible memory aliases. A stack load
+    denotes its input cell, not a claim about the cell's runtime contents.
+    """
+    def __init__(self, insns, limit=128):
+        self.insns = insns
+        self.limit = limit
+        self.steps = 0
+        self.memo = {}
+        cached = getattr(insns, 'slice_leaders', None)
+        if cached is not None:
+            self.leaders = cached
+            return
+        indices = {i.address: k for k, i in enumerate(insns)}
+        leaders = {0}
+        for k, i in enumerate(insns):
+            if i.mnemonic in ('b', 'br', 'ret', 'cbz', 'cbnz', 'tbz', 'tbnz') or i.mnemonic.startswith('b.'):
+                leaders.add(k + 1)
+                if i.operands and i.operands[-1].type == ARM64_OP_IMM:
+                    target = indices.get(i.operands[-1].imm)
+                    if target is not None:
+                        leaders.add(target)
+        self.leaders = sorted(leaders)
+        if isinstance(insns, Code):
+            insns.slice_leaders = self.leaders
+
+    def lower_bound(self, at):
+        floor = self.leaders[bisect_right(self.leaders, at) - 1]
+        return max(-1, floor - 1, at - self.limit)
+
+    @staticmethod
+    def width(name):
+        return 4 if name.startswith('w') else 8
+
+    def address(self, at, mem, depth):
+        i = self.insns[at]
+        if mem.index:
+            return None
+        base = i.reg_name(mem.base)
+        value = ('pointer', base, 0) if base in ('sp', 'fp', 'x29') else self.value(at, base, depth + 1)
+        if value and value[0] == 'pointer':
+            return ('pointer', value[1], value[2] + mem.disp)
         return None
-    for k in range(at-1, max(-1, at-32), -1):
-        i = insns[k]
-        if i.mnemonic in ('bl','blr') and register in {f'x{x}' for x in range(19)}:
+
+    def memory(self, at, address, width, depth):
+        if address is None:
             return None
-        ops = i.operands
-        if not ops:
-            continue
-        if i.mnemonic in ('ldr','ldur','ldp'):
-            dests = ops[:2] if i.mnemonic == 'ldp' else ops[:1]
-            for n, d in enumerate(dests):
-                if _reg(i,d)==register:
-                    mem=ops[len(dests)]
-                    if mem.type==ARM64_OP_MEM and i.reg_name(mem.mem.base)=='sp' and not mem.mem.index:
-                        return mem.mem.disp+n*8
+        # Calls delimit memory knowledge, but the resulting frame-cell identity
+        # is still useful for the separately validated parser context layout.
+        for k in range(at - 1, self.lower_bound(at), -1):
+            self.steps += 1
+            if self.steps > 2048:
+                return None
+            i = self.insns[k]
+            if i.mnemonic in ('bl', 'blr', 'b', 'br', 'ret') or i.mnemonic.startswith('b.') or i.mnemonic in ('cbz', 'cbnz', 'tbz', 'tbnz'):
+                break
+            _, writes = i.regs_access()
+            if any(i.reg_name(r) in ('sp', 'fp', 'x29') for r in writes):
+                break
+            if i.mnemonic in ('str', 'stur', 'stp', 'strb', 'strh', 'sturb', 'sturh'):
+                ops = i.operands
+                count = 2 if i.mnemonic == 'stp' else 1
+                dest = self.address(k, ops[count].mem, depth + 1)
+                if dest is None or i.writeback:
+                    return None  # An unlocated write may alias this spill.
+                if not re.fullmatch(r'[xw](?:\d+|zr)', i.reg_name(ops[0].reg)):
+                    return None  # SIMD stores have a different size/alias model.
+                size = 1 if i.mnemonic.endswith('b') else 2 if i.mnemonic.endswith('h') else self.width(i.reg_name(ops[0].reg))
+                for n in range(count):
+                    offset = dest[2] + n * size
+                    if dest[1] != address[1]:
+                        return None  # FP and SP can refer to overlapping storage.
+                    if offset < address[2] + width and address[2] < offset + size:
+                        if offset != address[2] or size != width:
+                            return None
+                        return self.value(k, i.reg_name(ops[n].reg), depth + 1)
+            elif i.mnemonic.startswith(('st', 'cas', 'swp')):
+                return None
+        return ('load', address, width, at)
+
+    def value(self, at, register, depth=0):
+        if depth > 16 or self.steps > 2048:
+            return None
+        width = self.width(register)
+        register = 'x' + register[1:] if register.startswith('w') else register
+        if register in ('xzr', 'wzr'):
+            return ('constant', 0)
+        if register in ('sp', 'fp', 'x29'):
+            return ('pointer', register, 0)
+        key = (at, register, width)
+        if key in self.memo:
+            return self.memo[key]
+        self.memo[key] = None
+        for k in range(at - 1, self.lower_bound(at), -1):
+            self.steps += 1
+            if self.steps > 2048:
+                return None
+            i = self.insns[k]; ops = i.operands; op = i.mnemonic
+            if op in ('b', 'br', 'ret') or op.startswith('b.') or op in ('cbz', 'cbnz', 'tbz', 'tbnz'):
+                return None
+            if op in ('bl', 'blr'):
+                if register not in {f'x{n}' for n in range(19, 30)}:
                     return None
-        if _reg(i,ops[0])==register:
-            if i.mnemonic=='mov' and len(ops)==2 and ops[1].type==ARM64_OP_REG:
-                return _stack_source(insns,k,_reg(i,ops[1]),depth+1)
-            # Comparisons and stores do not write their first operand.
-            if i.mnemonic in ('cmp','cmn','tst','str','stur','stp','cbz','cbnz','tbz','tbnz'):
                 continue
-            return None
+            _, written = i.regs_access()
+            if not any(i.reg_name(r).replace('w', 'x', 1) == register for r in written):
+                continue
+            result = None
+            dest_width = self.width(i.reg_name(ops[0].reg)) if ops and ops[0].type == ARM64_OP_REG else 8
+            if op == 'mov' and len(ops) == 2:
+                result = ('constant', ops[1].imm) if ops[1].type == ARM64_OP_IMM else self.value(k, i.reg_name(ops[1].reg), depth + 1)
+            elif op in ('movz', 'movn') and len(ops) >= 2 and ops[1].type == ARM64_OP_IMM:
+                v = ops[1].imm << ops[1].shift.value
+                result = ('constant', ~v if op == 'movn' else v)
+            elif op == 'movk' and ops[1].type == ARM64_OP_IMM:
+                old = self.value(k, i.reg_name(ops[0].reg), depth + 1)
+                if old and old[0] == 'constant':
+                    shift = ops[1].shift.value
+                    result = ('constant', (old[1] & ~(0xffff << shift)) | (ops[1].imm << shift))
+            elif op in ('add', 'sub') and len(ops) == 3 and ops[2].type == ARM64_OP_IMM:
+                base = self.value(k, i.reg_name(ops[1].reg), depth + 1)
+                amount = (ops[2].imm << ops[2].shift.value) * (1 if op == 'add' else -1)
+                if base and base[0] == 'constant':
+                    result = ('constant', base[1] + amount)
+                elif base and base[0] == 'pointer' and dest_width == 8:
+                    result = ('pointer', base[1], base[2] + amount)
+            elif op in ('ldr', 'ldur', 'ldp') and not i.writeback:
+                count = 2 if op == 'ldp' else 1
+                address = self.address(k, ops[count].mem, depth + 1)
+                n = next((n for n in range(count) if _reg(i, ops[n]) == register), None)
+                if address and n is not None:
+                    dest_width = self.width(i.reg_name(ops[n].reg))
+                    address = ('pointer', address[1], address[2] + n * dest_width)
+                    result = self.memory(k, address, dest_width, depth + 1)
+            if result and result[0] == 'constant':
+                result = ('constant', result[1] & ((1 << (8 * min(width, dest_width))) - 1))
+            elif result and min(width, dest_width) != 8:
+                result = None  # Truncating a pointer destroys its provenance.
+            if result and result[0] in ('pointer', 'load'):
+                base = result[1] if result[0] == 'pointer' else result[1][1]
+                aliases = {'fp', 'x29'} if base in ('fp', 'x29') else {base}
+                if any(aliases.intersection(j.reg_name(r) for r in j.regs_access()[1])
+                       for j in self.insns[k + 1:at]):
+                    result = None  # The coordinate frame moved after definition.
+            self.memo[key] = result
+            return result
+        return None
+
+
+def _stack_source(insns, at, register, *, since=0):
+    value = ArgumentSlice(insns).value(at, register)
+    if value and value[0] == 'load' and value[1][1] == 'sp' and value[2] == 8 and value[3] >= since:
+        return value[1][2]
     return None
 
 
@@ -260,6 +409,54 @@ def _shape(insns):
     return '\n'.join(rows)
 
 
+def _canonical_shape(shape, offsets=None):
+    """Normalize padding and bijective scratch-register allocation only.
+
+    Preserve ABI inputs/outputs (including x8), callee-saved registers, widths,
+    constants, memory accesses and every branch predicate. Branch targets are
+    remapped after removing NOP/BTI padding, never deleted with their guards.
+    """
+    if shape is None:
+        return None
+    rows = shape.splitlines()
+    offsets = list(offsets) if offsets is not None else list(range(0, 4 * len(rows), 4))
+    if not rows or len(rows) > 1024 or len(offsets) != len(rows) or len(set(offsets)) != len(rows):
+        return None
+    kept = [k for k, row in enumerate(rows) if row.split(' ', 1)[0] not in ('nop', 'bti')]
+    if not kept:
+        return None
+    positions = {}; next_position = len(kept) * 4
+    positions[offsets[-1] + 4] = next_position
+    for k in range(len(rows) - 1, -1, -1):
+        if k in kept:
+            next_position -= 4
+        positions[offsets[k]] = next_position
+    registers = {}
+    def register(match):
+        width, number = match[1], int(match[2])
+        if 9 <= number <= 17:
+            registers.setdefault(number, 9 + len(registers))
+            return width + str(registers[number])
+        return match[0]
+    result = []
+    for k in kept:
+        row = re.sub(r'\b([xw])(\d+)\b', register, rows[k])
+        branch = re.search(r'@(-?\d+)$', row)
+        if branch:
+            target = positions.get(int(branch[1]))
+            if target is None:
+                return None
+            row = row[:branch.start()] + '@' + str(target)
+        result.append(row)
+    return '\n'.join(result)
+
+
+def _equivalent_shape(insns, template, shape=None):
+    raw = _shape(insns) if shape is None else shape
+    normalized = _canonical_shape(raw, [i.address - insns[0].address for i in insns])
+    return normalized is not None and normalized == _canonical_shape(template)
+
+
 
 def _validator_graph(shape):
     """Compare acyclic validator control flow, independent of shared return layout.
@@ -310,20 +507,12 @@ def _validator_graph(shape):
 
 
 def _local_argument(insns, at, register, pointer=False):
-    """Bounded argument slice for immediate integers or frame-relative buffers."""
-    for k in range(at-1,max(-1,at-24),-1):
-        i=insns[k];ops=i.operands
-        if i.mnemonic in ('bl','blr') and register in {f'x{x}' for x in range(19)}:return None
-        if not ops or _reg(i,ops[0])!=register:continue
-        if i.mnemonic in ('cmp','cmn','tst','str','stur','stp','strb','strh','sturh','cbz','cbnz','tbz','tbnz'):continue
-        if i.mnemonic=='mov' and len(ops)==2:
-            if ops[1].type==ARM64_OP_REG:
-                register=_reg(i,ops[1]);continue
-            if not pointer and ops[1].type==ARM64_OP_IMM:return ops[1].imm
-        if pointer and i.mnemonic in ('add','sub') and len(ops)==3 and ops[2].type==ARM64_OP_IMM:
-            base=_reg(i,ops[1])
-            if base in ('sp','fp','x29'):return (base,ops[2].imm*(1 if i.mnemonic=='add' else -1))
-        return None
+    """Recover constants and frame pointers through bounded aliases/spills."""
+    value = ArgumentSlice(insns).value(at, register)
+    if value and pointer and value[0] == 'pointer':
+        return (value[1], value[2])
+    if value and not pointer and value[0] == 'constant':
+        return value[1]
     return None
 
 
@@ -351,7 +540,7 @@ def _reachable_code(img, start, budget=512):
             pending.append(i.operands[-1].imm)
             if i.mnemonic=='b':continue
         pending.append(address+4)
-    return [seen[a] for a in sorted(seen)]
+    return Code(seen[a] for a in sorted(seen))
 
 
 def _typed_call_shape(img, insns, helper_templates):
@@ -362,7 +551,7 @@ def _typed_call_shape(img, insns, helper_templates):
         target=i.operands[0].imm
         try:body=_reachable_code(img,target,128)
         except Unsupported:return None,[]
-        matches=[name for name,shape in helper_templates.items() if _shape(body)==shape]
+        matches=[name for name,shape in helper_templates.items() if _equivalent_shape(body,shape)]
         if len(matches)!=1:return None,[]
         rows[k]='bl '+matches[0]
         evidence.append({'call_va':hex(i.address),'helper_va':hex(target),'role':matches[0]})
@@ -372,9 +561,9 @@ def _typed_call_shape(img, insns, helper_templates):
 def _decimal_model(img, helper):
     if not helper or helper[-1].mnemonic!='bl':return None
     body=helper[:-1] # final stack-canary failure path, as in the existing model
-    if _shape(body)==DECIMAL_FORMAT_TEMPLATE:return 'multiply_decimal'
+    if _equivalent_shape(body,DECIMAL_FORMAT_TEMPLATE):return 'multiply_decimal'
     shape,_=_typed_call_shape(img,body,{'zero_buffer':ZERO_BUFFER_TEMPLATE})
-    if shape==DIVIDE_DECIMAL_TEMPLATE:return 'divide_decimal'
+    if shape is not None and _equivalent_shape(body,DIVIDE_DECIMAL_TEMPLATE,shape):return 'divide_decimal'
     return None
 
 
@@ -382,12 +571,16 @@ def _validator_model(img, guard):
     graph=_validator_graph(_shape(guard))
     if graph is not None and graph==_validator_graph(DEX_VALIDATOR_TEMPLATE):
         return 'inline_section_checks',[]
+    normalized = _canonical_shape(_shape(guard), [i.address-guard[0].address for i in guard])
+    graph = _validator_graph(normalized) if normalized else None
+    if graph is not None and graph == _validator_graph(_canonical_shape(DEX_VALIDATOR_TEMPLATE)):
+        return 'inline_section_checks',[]
     try:body=_reachable_code(img,guard[0].address)
     except Unsupported:return None,[]
     shape,evidence=_typed_call_shape(img,body,{
         'load_frame_arguments':DEX_FRAME_ARGUMENTS_TEMPLATE,
         'check_dex_section':DEX_SECTION_TEMPLATE})
-    if shape==OUTLINED_DEX_VALIDATOR_TEMPLATE:
+    if shape is not None and _equivalent_shape(body,OUTLINED_DEX_VALIDATOR_TEMPLATE,shape):
         return 'outlined_section_checks',evidence
     return None,[]
 
@@ -469,8 +662,11 @@ def _inline_numeric_selectors(img):
                                 selectors.append({'value':struct.pack('<H',value).decode(),'literal_va':hex(m.address),'jni_call_va':hex(i.address)})
     return selectors
 
-def extract_contract(img):
+def extract_contract(img, progress=None):
     candidates=[]
+    progress = progress if progress is not None else {}
+    def observed(stage):
+        progress[stage] = progress.get(stage, 0) + 1
     inline_selectors=_inline_numeric_selectors(img)+_formatted_numeric_selectors(img)
     for k,va in _address_refs(img.ins):
         try:
@@ -482,6 +678,7 @@ def extract_contract(img):
         parser=img.function(img.ins[k].address)
         if not any(i.mnemonic=='cmp' and i.operands[-1].type==ARM64_OP_IMM and i.operands[-1].imm==15 for i in parser):
             continue
+        observed('selector_table')
         formatted=list(_decimal_calls(img,parser))
         outer=[x['value'] for x in formatted]
         for j,i in enumerate(parser[:-1]):
@@ -493,15 +690,19 @@ def extract_contract(img):
                         outer.append(struct.pack('<H',val).decode())
         if len(set(outer))!=1:
             continue
+        observed('outer_selector')
         start=parser[0].address
         callers=[i for i in img.ins if i.mnemonic=='bl' and i.operands[0].imm==start]
         for call in callers:
             loader=img.function(call.address)
             pos=next(j for j,i in enumerate(loader) if i.address==call.address)
-            before=loader[pos-1]
-            if not(before.mnemonic=='add' and before.op_str.startswith('x0, sp, #')):
+            context = _local_argument(loader, pos, 'x0', True)
+            if context is None or context[0] != 'sp':
                 continue
-            anchor=before.operands[2].imm
+            anchor = context[1]
+            observed('parser_context')
+            def context_source(at, register):
+                return _stack_source(loader, at, register, since=pos + 1)
             def field(off):
                 if off is not None and off>=anchor+40 and (off-anchor-40)%16==0 and (off-anchor-40)//16<15:
                     return (off-anchor-40)//16
@@ -509,15 +710,15 @@ def extract_contract(img):
             for j,i in enumerate(loader):
                 slot=_jni_slot(loader,j)
                 if slot in (0x108,0x388):
-                    a,b=field(_stack_source(loader,j,'x2')),field(_stack_source(loader,j,'x3'))
+                    a,b=field(context_source(j,'x2')),field(context_source(j,'x3'))
                     if a is not None or b is not None:
                         events.append((slot,a,b,i.address))
                 elif slot==0x30:
-                    a=field(_stack_source(loader,j,'x1'))
+                    a=field(context_source(j,'x1'))
                     if a is not None:class_fields.append((a,i.address))
                 if i.mnemonic=='bl':
-                    a=field(_stack_source(loader,j,'x1'))
-                    off2=_stack_source(loader,j,'x2')
+                    a=field(context_source(j,'x1'))
+                    off2=context_source(j,'x2')
                     if a is not None and off2==anchor+40+a*16+8:
                         # The same helper must create both Java class-name strings.
                         helper=img.function(i.operands[0].imm)
@@ -539,12 +740,14 @@ def extract_contract(img):
             }
             remaining=set(range(15))-set(bindings.values())
             if len(set(bindings.values()))!=14 or len(remaining)!=1:continue
+            observed('jni_role_bindings')
             arrayindex=remaining.pop()
             if not _array_skip(parser,arrayindex):continue
+            observed('array_binding')
             guard=None
             for j in range(pos+1,min(pos+35,len(loader))):
                 i=loader[j]
-                if i.mnemonic=='bl' and _stack_source(loader,j,'x0')==anchor+0x128 and _stack_source(loader,j,'x1')==anchor+0x130:
+                if i.mnemonic=='bl' and context_source(j,'x0')==anchor+0x128 and context_source(j,'x1')==anchor+0x130:
                     guard=img.function(i.operands[0].imm)
                     break
             if guard is None:continue
@@ -554,6 +757,8 @@ def extract_contract(img):
             guard_model,guard_helpers=_validator_model(img,guard)
             known_guard = guard_model is not None
             trigger_consistent=len(inline_selectors)==1 and inline_selectors[0]['value']==outer[0]
+            if known_guard:observed('dex_validator')
+            if trigger_consistent:observed('trigger_agreement')
             candidates.append({'outer_key':outer[0], 'array_key':str(keys[arrayindex]),
                 'roles':{name:str(keys[index]) for name,index in bindings.items()},
                 'complete':known_guard and trigger_consistent, 'outer_trigger_evidence':inline_selectors, 'table_va':hex(va), 'parser_va':hex(start),
@@ -571,7 +776,8 @@ def _analyze_native(data):
     img=Image(data)
     strings=decode_descriptors(img)
     values={s['text'] for s in strings}
-    contracts=extract_contract(img)
+    progress = {}
+    contracts=extract_contract(img, progress)
     required={'java/nio/ByteBuffer','allocateDirect','java/lang/ClassLoader','org/json/JSONObject','getResponseCode','POST'}
     endpoints=[s for s in strings if re.fullmatch(r'https?://[^\s]+',s['text'])]
     complete=len(contracts)==1 and contracts[0]['complete'] and required<=values and len(endpoints)==1
@@ -584,6 +790,11 @@ def _analyze_native(data):
         'sha256':hashlib.sha256(data).hexdigest(), 'endpoint':endpoints[0]['text'] if len(endpoints)==1 else None,
         'http_method':'POST' if 'POST' in values else None, 'contracts':contracts,
         'strings':strings,'diagnostics':diagnostics,
+        'analysis_stages': [{'stage': name, 'status': 'observed' if progress.get(name) else 'unresolved',
+                             'candidate_count': progress.get(name, 0)}
+                            for name in ('selector_table', 'outer_selector', 'parser_context',
+                                         'jni_role_bindings', 'array_binding', 'dex_validator', 'trigger_agreement')],
+        'stage_limitation': 'Counts describe candidate paths, not coverage or a complete contract; final status retains all checks.',
         'evidence_level':'static_reconstruction_and_JNI_argument_binding',
         'runtime_execution_observed':False}
 
