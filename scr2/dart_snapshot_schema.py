@@ -1,11 +1,15 @@
-"""Dart 3.11.1 full-AOT compressed ARM64 format schema, not application data.
+"""Reviewed Dart full-AOT compressed ARM64 format schemas, not application data.
 
-Names/order derived from Dart SDK 3.11.1 runtime/vm/{class_id.h,
-stub_code_list.h,object_store.h,app_snapshot.cc}. See DART-SNAPSHOT-LICENSE.
+Base names/order derive from Dart SDK 3.11.1 runtime/vm/{class_id.h,
+stub_code_list.h,object_store.h,app_snapshot.cc}; reviewed 3.12.2 deltas are
+documented alongside SCHEMAS below. See DART-SNAPSHOT-LICENSE.
 Changing the snapshot version requires a reviewed serialization schema.
 """
 
+from dataclasses import dataclass
+
 SNAPSHOT_HASH = '78da37fed6bf1489361a312568249f3f'
+SNAPSHOT_HASH_3_12 = 'ace654289f5abc240509fc941453ebc5'
 
 CLASS_NAMES = ['Illegal',
  'NativePointer',
@@ -689,3 +693,44 @@ STORE_STUB_NAMES = {'dispatch_table_null_error_stub': 'DispatchTableNullError',
  'suspend_sync_star_at_start_stub': 'SuspendSyncStarAtStart',
  'suspend_sync_star_at_yield_stub': 'SuspendSyncStarAtYield',
  'instance_of_stub': 'InstanceOf'}
+
+
+@dataclass(frozen=True)
+class SnapshotSchema:
+    snapshot_hash: str
+    dart_version: str
+    vm_symbol_count: int
+    vm_stub_names: tuple[str, ...]
+    root_fields: tuple[str, ...]
+    immutable_tag: int
+    canonical_requires_immutable: bool = False
+
+
+# Reviewed against SDK 3.12.2 runtime/vm/{app_snapshot.cc,raw_object.h,
+# class_id.h,symbol_list.h,symbols.h,stub_code_list.h,object_store.h}:
+# * Predefined class IDs and supported cluster payload layouts are unchanged.
+# * Cluster tags serialize DeeplyImmutableBit (bit 7), replacing bit 6;
+#   canonical clusters must carry it. A CID may have multiple noncanonical
+#   clusters, distinguished by deep immutability; the reader preserves each.
+# * VM roots are 550 named symbols plus 256 character symbols (zero-based),
+#   then the symbol table. GetCStackPointer was removed; EnsureDeeplyImmutable
+#   was inserted immediately before UnknownDartCode.
+# * Two new object-store fields occur before the full-AOT boundary slow_tts_stub.
+#   tag_table occurs after that boundary and is deliberately not read.
+# RegExp payload flags also changed; RegExp remains unsupported by this bounded
+# reader in both formats, rather than silently applying an incompatible layout.
+_ROOT_FIELDS_3_12 = list(ROOT_FIELDS)
+_ROOT_FIELDS_3_12.insert(_ROOT_FIELDS_3_12.index('set_class') + 1, 'bigint_impl_class')
+_ROOT_FIELDS_3_12.insert(_ROOT_FIELDS_3_12.index('unique_dynamic_targets') + 1,
+                       'saved_unlinked_calls')
+_VM_STUB_NAMES_3_12 = [name for name in VM_STUB_NAMES if name != 'GetCStackPointer']
+_VM_STUB_NAMES_3_12.insert(_VM_STUB_NAMES_3_12.index('UnknownDartCode'),
+                          'EnsureDeeplyImmutable')
+
+SCHEMAS = {
+    SNAPSHOT_HASH: SnapshotSchema(SNAPSHOT_HASH, '3.11.1', 962,
+                                  tuple(VM_STUB_NAMES), tuple(ROOT_FIELDS), 1 << 6),
+    SNAPSHOT_HASH_3_12: SnapshotSchema(SNAPSHOT_HASH_3_12, '3.12.2', 806,
+                                       tuple(_VM_STUB_NAMES_3_12),
+                                       tuple(_ROOT_FIELDS_3_12), 1 << 7, True),
+}

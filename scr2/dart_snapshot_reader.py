@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import struct
 from flutter_semantic import Unsupported, elf_image, read_va, snapshot_identity
-from dart_snapshot_schema import CLASS_NAMES as names, VM_STUB_NAMES, ROOT_FIELDS, STORE_STUB_NAMES, SNAPSHOT_HASH
+from dart_snapshot_schema import CLASS_NAMES as names, STORE_STUB_NAMES, SNAPSHOT_HASH, SCHEMAS
 
 MAX_OBJECTS = 500_000
 MAX_ELEMENTS = 2_000_000
@@ -33,12 +33,13 @@ def symbol(data, name):
 
 class Reader:
 
-    def __init__(self, data, start=0):
+    def __init__(self, data, start=0, schema=None):
         self.data = data
         self.pos = start
         self.ref_limit = MAX_OBJECTS
         self.instructions = 0
         self.instoffset = 0
+        self.schema = schema or SCHEMAS[SNAPSHOT_HASH]
 
     def take(self, size):
         require(0 <= size <= len(self.data) - self.pos, 'truncated snapshot record')
@@ -78,19 +79,34 @@ class Reader:
                 return v
         raise Unsupported('Python snapshot reader: unterminated reference')
 
-def alloc(data, name, base_refs=None):
+def cluster_tag(tag, schema):
+    """Decode only the tag bits serialized by this reviewed SDK format."""
+    tag &= 0xffffffff
+    require(tag & 0xfff & ~(2 | schema.immutable_tag) == 0,
+            'unsupported cluster tag bits')
+    canonical = bool(tag & 2)
+    immutable = bool(tag & schema.immutable_tag)
+    require(not schema.canonical_requires_immutable or not canonical or immutable,
+            'canonical cluster is not deeply immutable')
+    return tag >> 12, canonical
+
+
+def alloc(data, name, base_refs=None, schema=None):
     sym, raw = symbol(data, name)
     require(len(raw) >= 128 and raw[:4] == bytes.fromhex('f5f5dcdc'), 'invalid snapshot magic')
     length, kind = struct.unpack_from('<QQ', raw, 4)
     length += 4
     require(52 < length <= len(raw) and kind == 3, 'requires bounded full-AOT snapshot')
-    require(raw[20:52] == SNAPSHOT_HASH.encode('ascii'), 'unsupported snapshot format')
+    actual_schema = SCHEMAS.get(raw[20:52].decode('ascii', errors='replace'))
+    require(actual_schema is not None, 'unsupported snapshot format')
+    require(schema is None or schema == actual_schema, 'VM/isolate snapshot format mismatch')
+    schema = actual_schema
     end = raw.find(b'\0', 52, min(length, 1024))
     require(end >= 0, 'unterminated snapshot features')
     flags = raw[52:end].decode('ascii').split()
     require({'product', 'no-code_comments', 'dwarf_stack_traces_mode', 'dedup_instructions', 'no-asan', 'no-msan', 'no-tsan', 'no-shared_data', 'arm64', 'android', 'compressed-pointers'} == set(flags), 'unsupported snapshot features')
     require('no-compressed-pointers' not in flags and 'debug' not in flags, 'unsupported VM layout')
-    r = Reader(raw[:length], end + 1)
+    r = Reader(raw[:length], end + 1, schema)
     base, objects = r.count(MAX_OBJECTS), r.count(MAX_OBJECTS)
     clusters = r.count(MAX_CLUSTERS)
     r.instructions, r.instoffset = r.count(), r.count(len(raw))
@@ -103,9 +119,7 @@ def alloc(data, name, base_refs=None):
     canonicalsets = {'String', 'TypeArguments', 'Type', 'FunctionType', 'RecordType', 'TypeParameter'}
     for i in range(clusters):
         pos = r.pos
-        tag = r.signed() & 4294967295
-        cid = tag >> 12
-        canonical = bool(tag & 2)
+        cid, canonical = cluster_tag(r.signed(), schema)
         name = names[cid] if cid < len(names) else 'Instance'
         c = {'cid': cid, 'name': name, 'canonical': canonical, 'start': nextref, 'offset': pos}
         count = r.count(MAX_OBJECTS)
@@ -365,20 +379,20 @@ def tables(data, raw, items, refs, reader, vm=False):
 
 def roots_parse(raw, r, refs, entry, vm=False):
     if vm:
-        stubnames = VM_STUB_NAMES
+        stubnames = r.schema.vm_stub_names
         rootrefs = []
         length = struct.unpack_from('<Q', raw, 4)[0] + 4
         while r.pos < length:
             rootrefs.append(r.ref())
-        # Symbols::kMaxPredefinedId: 962 predefined strings, then the symbol table.
-        require(len(rootrefs) == 963 + len(stubnames), 'VM root schema mismatch')
-        require(all(refs[v]['name'] == 'String' for v in rootrefs[:962]), 'invalid predefined symbols')
+        symbols = r.schema.vm_symbol_count
+        require(len(rootrefs) == symbols + 1 + len(stubnames), 'VM root schema mismatch')
+        require(all(refs[v]['name'] == 'String' for v in rootrefs[:symbols]), 'invalid predefined symbols')
         codes = rootrefs[-len(stubnames):]
         if not all((refs[v]['name'] == 'Code' for v in codes)):
             raise Unsupported('Invalid Dart snapshot record or root boundary')
         stubs = {refs[v]['entry']: name + 'Stub' for name, v in zip(stubnames, codes)}
         return stubs
-    fields = ROOT_FIELDS
+    fields = r.schema.root_fields
     roots = {f: r.ref() for f in fields}
     fieldtable = [r.ref() for _ in range(r.count())]
     shared = [r.ref() for _ in range(r.count())]
@@ -529,16 +543,18 @@ def export(refs, roots, dispatch, stubs):
 
 
 def supports(identity):
-    return identity.get('snapshot_hash') == SNAPSHOT_HASH
+    return identity.get('snapshot_hash') in SCHEMAS
 
 
 def recover(data):
     """Return pool and semantic metadata derived exclusively from this ELF."""
-    require(supports(snapshot_identity(data)), 'unsupported snapshot format; use a matching Blutter analyzer')
+    identity = snapshot_identity(data)
+    require(supports(identity), 'unsupported snapshot format; use a matching Blutter analyzer')
+    schema = SCHEMAS[identity['snapshot_hash']]
     try:
-        vm = alloc(data, '_kDartVmSnapshotData')
+        vm = alloc(data, '_kDartVmSnapshotData', schema=schema)
         vmrefs = fill(*vm)
-        iso = alloc(data, '_kDartIsolateSnapshotData', vmrefs)
+        iso = alloc(data, '_kDartIsolateSnapshotData', vmrefs, schema)
         refs = fill(*iso, vmrefs)
         ve = tables(data, vm[0], vm[2], vmrefs, vm[1], True)
         ie = tables(data, iso[0], iso[2], refs, iso[1])
@@ -546,7 +562,8 @@ def recover(data):
         roots, dispatch = roots_parse(iso[0], iso[1], refs, ie)
         stubs = copied_stubs(refs, roots, stubs)
         pool, metadata = export(refs, roots, dispatch, stubs)
-        metadata['reader'] = {'name': 'python_snapshot', 'schema': SNAPSHOT_HASH,
+        metadata['reader'] = {'name': 'python_snapshot', 'schema': schema.snapshot_hash,
+                              'dart_version': schema.dart_version,
                               'objects': len(refs) - 1, 'clusters': len(iso[2]),
                               'unresolved_code_stubs': sum(o['name'] == 'Code' and o.get('entry') not in stubs and o['refs'][0] == 1 for o in refs[1:])}
         return pool, metadata
