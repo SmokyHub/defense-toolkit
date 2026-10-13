@@ -662,12 +662,230 @@ def _inline_numeric_selectors(img):
                                 selectors.append({'value':struct.pack('<H',value).decode(),'literal_va':hex(m.address),'jni_call_va':hex(i.address)})
     return selectors
 
+
+def _register_family(name):
+    if name in ('fp', 'x29'):
+        return 'x29'
+    return re.sub(r'^[bhsdqv]', 'v', name) if re.fullmatch(r'[bhsdqv]\d+', name) else name.replace('w', 'x', 1)
+
+
+def _literal_address(code, at, register, depth=0):
+    """Resolve only local ADR/ADRP + immediate address construction."""
+    if depth > 4:
+        return None
+    register = _register_family(register)
+    reader = ArgumentSlice(code)
+    for k in range(at - 1, reader.lower_bound(at), -1):
+        i = code[k]
+        if i.mnemonic in ('bl', 'blr'):
+            return None
+        if register not in {_register_family(i.reg_name(r)) for r in i.regs_access()[1]}:
+            continue
+        if i.mnemonic in ('adr', 'adrp'):
+            return i.operands[1].imm
+        if i.mnemonic == 'add' and len(i.operands) == 3 and i.operands[2].type == ARM64_OP_IMM:
+            base = _literal_address(code, k, i.reg_name(i.operands[1].reg), depth + 1)
+            if base is not None:
+                return base + (i.operands[2].imm << i.operands[2].shift.value)
+        return None
+    return None
+
+
+def _frame_delta(code):
+    """FP minus SP after a fixed entry prologue; no guessed frame aliases."""
+    sp, fp = 0, None
+    for i in code[:64]:
+        if i.mnemonic in ('b', 'bl', 'br', 'blr', 'ret', 'cbz', 'cbnz', 'tbz', 'tbnz') or i.mnemonic.startswith('b.'):
+            break
+        ops = i.operands
+        written = {_register_family(i.reg_name(r)) for r in i.regs_access()[1]}
+        if not written.intersection(('sp', 'x29')):
+            continue
+        if (i.mnemonic in ('stp', 'str') and i.writeback and ops[-1].type == ARM64_OP_MEM
+                and i.reg_name(ops[-1].mem.base) == 'sp'):
+            sp += ops[-1].mem.disp
+        elif (i.mnemonic in ('mov', 'add', 'sub') and len(ops) >= 2 and i.reg_name(ops[1].reg) == 'sp'
+              and (i.mnemonic == 'mov' or len(ops) == 3 and ops[2].type == ARM64_OP_IMM)):
+            amount = 0 if i.mnemonic == 'mov' else ops[2].imm << ops[2].shift.value
+            value = sp + (-amount if i.mnemonic == 'sub' else amount)
+            if _register_family(i.reg_name(ops[0].reg)) == 'x29':
+                fp = value
+            elif i.reg_name(ops[0].reg) == 'sp':
+                sp = value
+            else:
+                return None
+        else:
+            return None
+    return fp - sp if fp is not None else None
+
+
+def _frame_cell(code, at, mem, delta):
+    address = ArgumentSlice(code).address(at, mem, 0)
+    if address is None:
+        return None
+    _, base, offset = address
+    if base in ('fp', 'x29'):
+        return offset + delta if delta is not None else None
+    return offset if base == 'sp' else None
+
+
+def _readonly_selector_copies(img, code):
+    """Bounded read-only load -> stack copy of a complete decimal C string.
+
+    Includes a D-register load followed by an S-register store. The bytes are
+    read from this ELF, never inferred from package names or expected keys.
+    """
+    widths = {'b': 1, 'h': 2, 's': 4, 'd': 8, 'q': 16, 'w': 4, 'x': 8}
+    delta = _frame_delta(code)
+    for k, store in enumerate(code):
+        if store.mnemonic not in ('str', 'stur') or store.writeback or len(store.operands) != 2:
+            continue
+        name = store.reg_name(store.operands[0].reg)
+        width = widths.get(name[:1])
+        cell = _frame_cell(code, k, store.operands[1].mem, delta)
+        if width is None or cell is None:
+            continue
+        for j in range(k - 1, ArgumentSlice(code).lower_bound(k), -1):
+            load = code[j]
+            if load.mnemonic in ('bl', 'blr'):
+                break
+            if _register_family(name) not in {_register_family(load.reg_name(r)) for r in load.regs_access()[1]}:
+                continue
+            if (load.mnemonic not in ('ldr', 'ldur') or load.writeback or len(load.operands) != 2
+                    or widths.get(load.reg_name(load.operands[0].reg)[:1], 0) < width):
+                break
+            mem = load.operands[1]
+            if mem.type != ARM64_OP_MEM or mem.mem.index:
+                break
+            base = _literal_address(code, j, load.reg_name(mem.mem.base))
+            if base is None:
+                break
+            va = base + mem.mem.disp
+            if not any(not s['p_flags'] & 2 and s['p_vaddr'] <= va
+                       and va + width <= s['p_vaddr'] + s['p_filesz'] for s in img.loads):
+                break
+            raw = img.read(va, width)
+            if re.fullmatch(rb'[0-9]{1,12}\x00+', raw):
+                yield {'value': raw.rstrip(b'\0').decode('ascii'), 'selector_source': 'readonly_stack_copy',
+                       'literal_va': hex(va), 'load_va': hex(load.address), 'store_va': hex(store.address),
+                       'index': k, 'cell': cell, 'width': width}
+            break
+
+
+def _copy_reaches_use(code, copy, use):
+    """Require initialization on every CFG path reaching the use, without clobbers."""
+    positions = {i.address: k for k, i in enumerate(code)}
+    delta = _frame_delta(code)
+    pending, seen, reached = [(0, False)], set(), False
+    while pending:
+        k, valid = pending.pop()
+        if (k, valid) in seen:
+            continue
+        if k >= len(code) or len(seen) >= 4096:
+            return False
+        seen.add((k, valid))
+        if k == use:
+            if not valid:
+                return False
+            reached = True
+            continue
+        i = code[k]
+        if k == copy['index']:
+            valid = True
+        elif valid:
+            writes = {_register_family(i.reg_name(r)) for r in i.regs_access()[1]}
+            if writes.intersection(('sp', 'x29')) or i.mnemonic in ('bl', 'blr'):
+                valid = False
+            elif i.mnemonic.startswith(('st', 'cas', 'swp')):
+                count = 2 if i.mnemonic == 'stp' else 1
+                if i.mnemonic not in ('str', 'stur', 'stp', 'strb', 'sturb', 'strh', 'sturh') or i.writeback:
+                    valid = False
+                else:
+                    cell = _frame_cell(code, k, i.operands[count].mem, delta)
+                    name = i.reg_name(i.operands[0].reg)
+                    width = 1 if i.mnemonic.endswith('b') else 2 if i.mnemonic.endswith('h') else {'w': 4, 'x': 8, 's': 4, 'd': 8, 'q': 16}.get(name[:1])
+                    if cell is None or width is None or (cell < copy['cell'] + copy['width'] and copy['cell'] < cell + count * width):
+                        valid = False
+        if i.mnemonic == 'br':
+            return False  # An unknown jump could bypass the initialization.
+        if i.mnemonic == 'ret':
+            continue
+        if i.mnemonic == 'b' or i.mnemonic.startswith('b.') or i.mnemonic in ('cbz', 'cbnz', 'tbz', 'tbnz'):
+            target = positions.get(i.operands[-1].imm)
+            if target is None:
+                return False
+            pending.append((target, valid))
+            if i.mnemonic == 'b':
+                continue
+        pending.append((k + 1, valid))
+    return reached
+
+
+def _copied_numeric_selectors(img, code, parser=False):
+    copies = list(_readonly_selector_copies(img, code))
+    if not copies:
+        return
+    delta = _frame_delta(code)
+    for k, i in enumerate(code):
+        cell = None
+        if not parser and _jni_slot(code, k) == 0x538:
+            pointer = _local_argument(code, k, 'x1', True)
+            if pointer:
+                base, offset = pointer
+                cell = offset if base == 'sp' else offset + delta if base in ('fp', 'x29') and delta is not None else None
+        elif parser and 6 <= k and k + 6 < len(code):
+            # Reviewed three-character comparison: first two bytes and byte 2.
+            # It is bound to the copied buffer, not any numeric rodata string.
+            a, b, c, d, cmp, ccmp, branch = code[k:k + 7]
+            if ([x.mnemonic for x in (a, b, c, d, cmp, ccmp, branch)] !=
+                    ['ldurh', 'ldurb', 'ldrh', 'ldrb', 'cmp', 'ccmp', 'b.ne']):
+                continue
+            header, mask, length, move, reject, pointer = code[k - 6:k]
+            if ([x.mnemonic for x in (header, mask, length, move, reject, pointer)] !=
+                    ['ldr', 'and', 'cmp', 'mov', 'b.ne', 'ldr']):
+                continue
+            hreg = _reg(header, header.operands[0])
+            if (header.operands[1].type != ARM64_OP_MEM or header.operands[1].mem.index
+                    or header.operands[1].mem.disp != 0
+                    or [_reg(mask, o) for o in mask.operands[:2]] != [hreg, hreg]
+                    or mask.operands[2].type != ARM64_OP_IMM or mask.operands[2].imm & MASK != MASK ^ 255
+                    or _reg(length, length.operands[0]) != hreg or length.operands[1].type != ARM64_OP_IMM
+                    or length.operands[1].imm != 3 << 8
+                    or pointer.operands[1].type != ARM64_OP_MEM or pointer.operands[1].mem.index
+                    or pointer.operands[1].mem.base != header.operands[1].mem.base
+                    or pointer.operands[1].mem.disp != 8
+                    or pointer.operands[0].reg != c.operands[1].mem.base
+                    or reject.operands[0].imm != branch.operands[0].imm
+                    or len({_reg(x, x.operands[0]) for x in (a, b, c, d)}) != 4
+                    or _reg(pointer, pointer.operands[0]) in {_reg(x, x.operands[0]) for x in (a, b)}):
+                continue
+            cell = _frame_cell(code, k, a.operands[1].mem, delta)
+            second = _frame_cell(code, k + 1, b.operands[1].mem, delta)
+            if (cell is None or second != cell + 2 or c.operands[1].mem.index or d.operands[1].mem.index
+                    or c.operands[1].mem.base != d.operands[1].mem.base
+                    or c.operands[1].mem.disp != 0 or d.operands[1].mem.disp != 2
+                    or [_reg(cmp, o) for o in cmp.operands] != [_reg(c, c.operands[0]), _reg(a, a.operands[0])]
+                    or [_reg(ccmp, o) for o in ccmp.operands[:2]] != [_reg(d, d.operands[0]), _reg(b, b.operands[0])]
+                    or ccmp.op_str.split(',')[-1].strip() != 'eq' or ccmp.operands[2].imm != 0):
+                continue
+        if cell is None:
+            continue
+        for copy in copies:
+            if copy['cell'] != cell or parser and len(copy['value']) != 3:
+                continue
+            if _copy_reaches_use(code, copy, k):
+                yield {key: value for key, value in copy.items() if key not in ('index', 'cell', 'width')} | {
+                    'comparison_va' if parser else 'jni_call_va': hex(i.address)}
+
+
 def extract_contract(img, progress=None):
     candidates=[]
     progress = progress if progress is not None else {}
     def observed(stage):
         progress[stage] = progress.get(stage, 0) + 1
     inline_selectors=_inline_numeric_selectors(img)+_formatted_numeric_selectors(img)
+    for start in img.starts:
+        inline_selectors.extend(_copied_numeric_selectors(img, img.function(start)))
     for k,va in _address_refs(img.ins):
         try:
             keys=struct.unpack('<15Q',img.read(va,120))
@@ -681,6 +899,8 @@ def extract_contract(img, progress=None):
         observed('selector_table')
         formatted=list(_decimal_calls(img,parser))
         outer=[x['value'] for x in formatted]
+        copied = list(_copied_numeric_selectors(img, parser, parser=True))
+        outer.extend(x['value'] for x in copied)
         for j,i in enumerate(parser[:-1]):
             if i.mnemonic=='mov' and i.operands[-1].type==ARM64_OP_IMM:
                 val=i.operands[-1].imm
@@ -761,7 +981,8 @@ def extract_contract(img, progress=None):
             if trigger_consistent:observed('trigger_agreement')
             candidates.append({'outer_key':outer[0], 'array_key':str(keys[arrayindex]),
                 'roles':{name:str(keys[index]) for name,index in bindings.items()},
-                'complete':known_guard and trigger_consistent, 'outer_trigger_evidence':inline_selectors, 'table_va':hex(va), 'parser_va':hex(start),
+                'complete':known_guard and trigger_consistent, 'outer_trigger_evidence':inline_selectors,
+                'outer_parser_copy_evidence':copied, 'table_va':hex(va), 'parser_va':hex(start),
                 'loader_va':hex(loader[0].address), 'dex_validator_va':hex(guard[0].address),
                 'validator_model':guard_model,'validator_helpers':guard_helpers,
                 'role_evidence':[{'jni_slot':hex(s),'name_key':str(keys[a]),'signature_key':str(keys[b]),'call_va':hex(c)} for s,a,b,c in events],
