@@ -45,9 +45,9 @@ def fixture_bytes():
         if path.is_file():
             data = path.read_bytes()
             if len(data) != 5120 or hashlib.sha256(data).hexdigest() != FIXTURE_SHA256:
-                raise ValueError('Proof fixture differs from the runtime-tested DEX: ' + str(path))
+                raise ValueError('Bundled proof DEX failed its size or SHA-256 integrity check: ' + str(path))
             return data
-    raise ValueError('Tested DEX missing. Use the complete portable family3 folder, or build the workspace fixture.')
+    raise ValueError('Bundled proof DEX missing. Use the complete portable family3 folder, or build the workspace fixture.')
 
 
 def make_proof(analysis, dex):
@@ -86,7 +86,8 @@ def make_proof(analysis, dex):
         'button_after': 'DEX button handler executed',
         'logcat_tag': 'APKDefenseFixture',
         'required_runtime_markers': ['ENTRY_CALLED', 'UI_INSTALLED', 'BUTTON_EXECUTED'],
-        'validation': 'Exact benign DEX executed in all four recorded Family3 apps. Newly analyzed inputs still require runtime validation; automatic array and retained-Context provenance remain incomplete.',
+        'limitations': ['Runtime execution has not been observed for this input.',
+                        'Automatic array and retained-Context provenance remain incomplete.'],
         'response': response,
     }
 
@@ -190,7 +191,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('inputs', nargs='+', type=Path, help='original APK/split ZIP, split directory, or extracted .so files')
     p.add_argument('--out', type=Path, help='analysis JSON file (default: stdout)')
-    p.add_argument('--proof-response', type=Path, help='write local response JSON containing the exact tested benign DEX; also embed it in the analysis JSON')
+    p.add_argument('--proof-response', type=Path, help='write local response JSON containing the bundled benign DEX; also embed it in the analysis JSON')
     p.add_argument('--node', default='node', help='Node.js executable (default: node)')
     a = p.parse_args()
     try:

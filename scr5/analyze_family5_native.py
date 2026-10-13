@@ -13,6 +13,7 @@ import zipfile
 from elftools.common.exceptions import ELFError
 from family5_input import collect
 from family5_native import analyze_native
+from classloader_report import render, summaries
 
 
 def analyze(inputs):
@@ -38,6 +39,7 @@ def analyze(inputs):
         for result in results:
             result.pop('recovered_files', None)
     return {'format': 'apk-defense.family5/v1', 'family': 'family5', 'status': status,
+            'payload_origin': 'bundled_apk_assets' if status == 'static_asset_dex_recovered' else 'not_recovered',
             'results': results, 'skipped_inputs': skipped,
             'runtime_execution_observed': False,
             'limitations': [
@@ -61,7 +63,9 @@ def main(argv=None):
         for name, payload in artifacts.items():
             (args.out / name).write_bytes(payload)
         (args.out / 'analysis.json').write_text(json.dumps(report, indent=2) + '\n')
+        (args.out / 'classloaders.txt').write_text(render(report))
         print(json.dumps({'status': report['status'], 'analysis': str(args.out / 'analysis.json'),
+                          'classloader_report': str(args.out / 'classloaders.txt'), 'classloaders': summaries(report),
                           'recovered_files': [str(args.out / name) for name in artifacts]}))
         return 0 if report['status'] == 'static_asset_dex_recovered' else 2
     except (OSError, ValueError, zipfile.BadZipFile, ELFError) as error:

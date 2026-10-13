@@ -7,6 +7,51 @@ import zlib
 from pathlib import Path
 from family5_elf import Image, Unsupported, ArgumentSlice, _address_refs, _jni_slot
 from capstone.arm64 import ARM64_OP_IMM, ARM64_OP_MEM
+from classloader_report import location, unresolved
+
+
+def classloader_evidence(img, pool, loaders):
+    report = unresolved('No unique JNI loader routine was identified.')
+    if len(loaders) != 1:
+        return report
+    loader = loaders[0]; code = img.function(int(loader['function_va'], 16))
+    report.update(status='structural_evidence_only', mechanism='suspected_existing_loader_dex_path_injection',
+                  function=location(img, code[0].address),
+                  reason='JNI object-array replacement follows bundled-asset DEX reconstruction. Class names remain AES-encrypted; PathClassLoader, DexClassLoader and InMemoryDexClassLoader are not resolved types.')
+    report['operations'] = [{'api': c['api'], 'location': location(img, int(c['va'], 16))} for c in loader['calls']]
+    models = json.loads(Path(__file__).with_name('family5_models.json').read_text())['classloader_references']
+    imports = import_targets(img)
+    if code_shape(img, code, imports)[0] != models['loader_shape']:
+        report['reference_diagnostic'] = 'unreviewed_loader_layout; encrypted-name use sites not assigned'
+        return report
+    sources = dict(_address_refs(code)); pool_by_va = {int(s['va'], 16): s['text'] for s in pool['strings']}
+    references = []
+    for entry in models['references']:
+        values = [sources.get(k) for k in entry['source_indices']]
+        if not values or values[0] is None or len(set(values)) != 1:
+            report['reference_diagnostic'] = 'inconsistent_encrypted_string_address_references'
+            return report
+        va = values[0]; text = pool_by_va.get(va, '')
+        if not re.fullmatch('[0-9a-f]{32,512}', text) or len(text) % 32:
+            report['reference_diagnostic'] = 'referenced_constructor_string_is_not_AES_block_hex'
+            return report
+        decode = code[entry['decode_index']]; lookup = code[entry['lookup_index']]
+        decoder = img.function(decode.operands[0].imm) if decode.mnemonic == 'bl' else []
+        if (not decoder or decoder[0].address != decode.operands[0].imm
+                or _jni_slot(code, entry['lookup_index']) != 0x30
+                or code_shape(img, decoder, imports)[0] != models['decoder_shape']):
+            report['reference_diagnostic'] = 'decoder_or_FindClass_binding_not_validated'
+            return report
+        references.append({'text': None, 'resolution': 'encrypted_name_unresolved',
+                           'encoding': 'constructor_XOR_then_hex_AES_128_CBC',
+                           'storage': location(img, va), 'encoded_bytes': len(text) + 1,
+                           'address_reference': location(img, code[entry['source_indices'][-1]].address),
+                           'decode_call': location(img, decode.address),
+                           'decoder_function': location(img, decode.operands[0].imm),
+                           'jni_lookup': location(img, lookup.address), 'jni_api': 'FindClass',
+                           'binding': 'complete_reviewed_loader_and_decoder_instruction_models; class plaintext not recovered'})
+    report['references'] = references
+    return report
 
 def import_targets(img):
     slots = {}
@@ -261,6 +306,7 @@ def analyze_native(data, assets):
         result['diagnostics'].append('asset_transform_unmodeled_or_ambiguous')
         return result, []
     result['class_loading'] = loader_evidence(img, models[0])
+    result['classloader'] = classloader_evidence(img, pool, result['class_loading'])
     candidates = recover_payload(pool, assets, models[0])
     result['payloads'] = [evidence for evidence, _ in candidates]
     recovered = [payload for _, payload in candidates if payload is not None]

@@ -266,7 +266,7 @@ function analyzeNative(bytes,name="<memory>"){
   const chosen={resolver_class:"java/lang/Class",resolver_method:"forName",resolver_descriptor:"(Ljava/lang/String;)Ljava/lang/Class;",loader_class:"dalvik.system.InMemoryDexClassLoader",parent_getter_name:"getClassLoader",parent_getter_descriptor:"()Ljava/lang/ClassLoader;",constructor_name:"<init>",loader_constructor_descriptor:"(Ljava/nio/ByteBuffer;Ljava/lang/ClassLoader;)V",load_class_method:"loadClass",load_class_descriptor:"(Ljava/lang/String;)Ljava/lang/Class;",payload_class:"PAYLOAD_CLASS_NAME",payload_constructor_descriptor:"()V",entry_method:"ENTRY_METHOD_NAME",entry_descriptor:"(Landroid/content/Context;)V"};
   const fields=Object.fromEntries(bound.bindings.map(x=>[String(x.key),chosen[x.role]]));
   fields[String(bound.arrayKey)]="DEX ARRAY";
-  contract_candidate={status:"needs_review",evidence:"conditional static JNI-compatible choices, not remote values or execution",outer:String(bound.outer),storage:String(bound.storage),roles:Object.fromEntries(bound.bindings.map(x=>[x.role,String(x.key)])),array_key_candidate:String(bound.arrayKey),template:{[String(bound.outer)]:fields},validation:{string_roles:"bound through destinations and JNI arguments on a conditional success path",array_source:"independent getter-to-vector parser binding still required",context_source:"initializer-to-retained-Context binding still required",runtime:"unobserved"}};
+  contract_candidate={status:"needs_review",evidence:"conditional static JNI-compatible choices, not remote values or execution",outer:String(bound.outer),storage:String(bound.storage),roles:Object.fromEntries(bound.bindings.map(x=>[x.role,String(x.key)])),array_key_candidate:String(bound.arrayKey),template:{[String(bound.outer)]:fields},analysis_limits:{string_roles:"bound through destinations and JNI arguments on a conditional success path",array_source:"independent getter-to-vector parser binding still required",context_source:"initializer-to-retained-Context binding still required",runtime:"unobserved"}};
  }
  return{name,status,modified_mmkv_context_signature:changed,role_binding:bound,contract,contract_candidate,decoded_record_count:records.length,decoded_records:records.map(r=>({va:r.va,text:r.text})),config_urls:urls,limits:["ARM64 ELF64 LE with section headers and RELA only","Observed compiler layout requires fifteen selector getters at 24-byte call spacing","Automatic array parser and initializer Context provenance are incomplete; complete response contracts remain needs_review","Capability pattern does not prove execution, maliciousness or attribution"]};
 }
@@ -303,7 +303,6 @@ const output = {
           loaders.length ? "family3_loader_pattern" :
           results.some(r => r.status !== "no_family3_pattern") ? "needs_review" : "no_family3_pattern",
   evidence: "static capability/patterns; remote values, execution and RMG are unconfirmed",
-  validated_scope: "four homologous ARM64 builds; changed def-use/layout requires review",
   results
 };
 process.stdout.write(JSON.stringify(output, null, 2) + "\n");
