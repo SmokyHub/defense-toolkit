@@ -454,7 +454,23 @@
       },
       "constants": [],
       "string_calls": {},
-      "shape_sha256": "4ce8f390acc6efe2437782695c121a47d221ee415180f7a6a8cf5dd3a0d99a5f"
+      "shape_sha256": "b911efb5557ec2fefe4da1ab36f8434264a32c9450c68b1317369c354eef702d",
+      "parameters": {
+        "9": 1,
+        "35": 1,
+        "36": 1,
+        "26": 1,
+        "27": 1,
+        "54": 1,
+        "57": 1,
+        "64": 1,
+        "68": 1,
+        "69": 1,
+        "70": 1,
+        "72": 2,
+        "73": 1,
+        "74": 1
+      }
     },
     "loader": {
       "instructions": 703,
@@ -4750,11 +4766,31 @@
       63
     ],
     "count": 127,
-    "offset_mask": 66289942,
-    "length_mask": 3321788069,
-    "seed_mask": 3531647822,
-    "index_mask": 27496,
-    "pool_size": 2720
+    "pool_size": 2720,
+    "parameter_sites": {
+      "index_mask": 9,
+      "offset_mask": [
+        35,
+        36
+      ],
+      "length_mask": [
+        26,
+        27
+      ],
+      "seed_mask": [
+        54,
+        57
+      ],
+      "xorshift": [
+        64,
+        68,
+        69
+      ],
+      "subtract_state_shift": 70,
+      "rotate_right": 72,
+      "rotate_complement": 73,
+      "xor_state_shift": 74
+    }
   },
   "selector_table_instruction": 4,
   "outer_selector_site": [

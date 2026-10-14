@@ -73,6 +73,11 @@ def shape(code, overrides):
     return '\n'.join(rows)
 
 
+def parameter_shape(ins, count):
+    """Mask reviewed scalar operands only; retain opcodes, widths and shifts' kinds."""
+    return ins.mnemonic + ' ' + re.sub(r'#-?(?:0x[0-9a-f]+|\d+)', '<parameter>', ins.op_str, count=count)
+
+
 def map_id(img, start, value, imported):
     """Interpret a bounded, pure integer decision tree. No memory or guest calls."""
     from family4_native import Unsupported, ARM64_OP_IMM, ARM64_OP_REG
@@ -162,6 +167,9 @@ def verify_graph(img, root, model):
                 raise Unsupported('changed indexed selector argument')
             replacements[k] = 'mov w0, <input-selector>'
             constants[(name,k)] = i.operands[1].imm
+        for key, count in spec.get('parameters', {}).items():
+            k = int(key)
+            replacements[k] = parameter_shape(code[k], count)
         if hashlib.sha256(shape(code,replacements).encode()).hexdigest() != spec['shape_sha256']:
             raise Unsupported('changed indexed instruction graph: ' + name)
     # Check immutable SIMD/scalar parser limits referenced through ADRP pages.
@@ -172,9 +180,39 @@ def verify_graph(img, root, model):
     return bound, codes, references, constants, imported
 
 
-def decode_pool(img, addresses, model, imported):
+def decoder_parameters(model, code=None):
+    """Derive scalar transform parameters after the complete body was checked."""
     from family4_native import Unsupported
-    decoder = model['decoder']; refs = addresses
+    params = dict(model['decoder'])
+    sites = params.get('parameter_sites')
+    if code is None or not sites:
+        raise Unsupported('indexed decoder requires verified instruction parameters')
+    def word(pair):
+        lo,hi = (code[k].operands[1].imm for k in pair)
+        if not 0 <= lo <= 65535 or not 0 <= hi <= 65535:
+            raise Unsupported('indexed decoder mask outside 32-bit model')
+        return lo | (hi << 16)
+    for key in ('offset_mask','length_mask','seed_mask'):
+        params[key] = word(sites[key])
+    params['index_mask'] = code[sites['index_mask']].operands[1].imm
+    params['xorshift'] = [code[k].operands[2].shift.value for k in sites['xorshift']]
+    params['subtract_state_shift'] = code[sites['subtract_state_shift']].operands[2].shift.value
+    params['xor_state_shift'] = code[sites['xor_state_shift']].operands[2].shift.value
+    rotate, width = (op.imm for op in code[sites['rotate_right']].operands[2:])
+    complement = code[sites['rotate_complement']].operands[2].shift.value
+    if not 1 <= rotate <= 7 or width != 8-rotate or complement != 8-rotate:
+        raise Unsupported('inconsistent indexed byte rotation')
+    params['rotate_right'] = rotate
+    if (not all(1 <= s <= 31 for s in params['xorshift']) or
+        not 0 <= params['subtract_state_shift'] <= 24 or not 0 <= params['xor_state_shift'] <= 24 or
+        not 0 <= params['index_mask'] <= 65535):
+        raise Unsupported('indexed decoder parameter outside supported range')
+    return params
+
+
+def decode_pool(img, addresses, model, imported, decoder_code=None):
+    from family4_native import Unsupported
+    decoder = decoder_parameters(model, decoder_code); refs = addresses
     tables = [refs[('decoder', k)] for k in decoder['table_instructions']]
     offsets,seeds,addends,lengths,cipher = tables
     rows = []
@@ -186,9 +224,11 @@ def decode_pool(img, addresses, model, imported):
         state = ((word(seeds)^decoder['seed_mask'])+word(addends)) & 0xffffffff
         plain = bytearray()
         for j,byte in enumerate(img.read(cipher+start,size)[::-1]):
-            state ^= (state << 5) & 0xffffffff; state ^= state >> 17; state ^= (state << 7) & 0xffffffff
-            v = (byte-j-(state>>16)) & 255
-            plain.append(((v>>1)|((v<<7)&255))^(state>>24))
+            left,right,last = decoder['xorshift']
+            state ^= (state << left) & 0xffffffff; state ^= state >> right; state ^= (state << last) & 0xffffffff
+            v = (byte-j-(state>>decoder['subtract_state_shift'])) & 255
+            rotation = decoder['rotate_right']
+            plain.append(((v>>rotation)|((v<<(8-rotation))&255))^((state>>decoder['xor_state_shift'])&255))
         try: text = plain.decode('utf-8')
         except UnicodeError as error: raise Unsupported('indexed plaintext is not UTF-8') from error
         if any(ord(c)<32 or ord(c)==127 for c in text): raise Unsupported('indexed plaintext has control bytes')
@@ -200,8 +240,23 @@ def decode_pool(img, addresses, model, imported):
 
 
 def analyze_indexed(img):
+    results = []
+    for filename in ('family4_indexed_models.json', 'family4_indexed_rotated_models.json'):
+        model = json.loads(Path(__file__).with_name(filename).read_text())
+        result = _analyze_model(img, model)
+        if result is not None:
+            results.append(result)
+    supported = [r for r in results if r['status'] == 'supported']
+    if len(supported) == 1:
+        return supported[0]
+    if len(supported) > 1:
+        return {'family':'family4', 'status':'needs_review', 'contracts':[], 'strings':[],
+                'diagnostics':['ambiguous indexed instruction models']}
+    return results[0] if results else None
+
+
+def _analyze_model(img, model):
     from family4_native import Unsupported, _validator_model, _jni_slot, _stack_source
-    model = json.loads(Path(__file__).with_name('family4_indexed_models.json').read_text())
     roots = []
     for sec in img.elf.iter_sections():
         if sec['sh_type'] in ('SHT_DYNSYM','SHT_SYMTAB'):
@@ -211,14 +266,15 @@ def analyze_indexed(img):
     try: bound,codes,refs,constants,imported = verify_graph(img,root,model)
     except Unsupported: return None
     try:
-        rows = decode_pool(img,refs,model,imported)
+        params = decoder_parameters(model, codes['decoder'])
+        rows = decode_pool(img,refs,model,imported,codes['decoder'])
         for row in rows: row['decoder_va'] = hex(bound['decoder'])
         for name,spec in model['functions'].items():
             for k in spec.get('string_calls', []):
                 call = codes[name][int(k)]
                 binding = spec['string_calls'][str(k)]
                 argument = constants[(name,binding['argument_instruction'])]
-                index = map_id(img,bound['mapper'],argument,imported)^model['decoder']['index_mask']
+                index = map_id(img,bound['mapper'],argument,imported)^params['index_mask']
                 if not 0 <= index < len(rows): raise Unsupported('unresolved indexed string call')
                 text = rows[index]['text']
                 patterns = {'endpoint':r'https?://[^\s]+','bridge_class':r'[A-Za-z_$][A-Za-z0-9_$/]*',
@@ -261,6 +317,7 @@ def analyze_indexed(img):
                     'header_and_table_bounds':True,'dex_checksum_checked_by_native':False},
                     'additional_checks':'Reviewed JSON preflight, allocation budgets, descriptor syntax and JNI type/assignability checks; conditional static contract.'}
         return {'family':'family4','variant':'indexed_string_pool','status':'supported',
+                'decoder_transform': {k:params[k] for k in ('xorshift','subtract_state_shift','xor_state_shift','rotate_right')},
                 'sha256':hashlib.sha256(img.data).hexdigest(),'endpoint':endpoints[0],'http_method':'POST',
                 'strings':rows,'contracts':[contract],'diagnostics':[],
                 'analysis_stages':[{'stage':'indexed_instruction_graph','status':'observed','candidate_count':len(bound)}],
