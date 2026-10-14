@@ -995,6 +995,10 @@ def extract_contract(img, progress=None):
 def _analyze_native(data):
     """Return findings; only one complete, recognized contract enables proof."""
     img=Image(data)
+    from family4_indexed import analyze_indexed
+    indexed = analyze_indexed(img)
+    if indexed is not None:
+        return indexed
     strings=decode_descriptors(img)
     values={s['text'] for s in strings}
     progress = {}
