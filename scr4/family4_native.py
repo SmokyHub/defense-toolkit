@@ -997,6 +997,12 @@ def _analyze_native(data):
     img=Image(data)
     from family4_indexed import analyze_indexed
     indexed = analyze_indexed(img)
+    if indexed is not None and indexed.get('status') == 'supported':
+        return indexed
+    from family4_core import analyze_core
+    core = analyze_core(img)
+    if core is not None:
+        return core
     if indexed is not None:
         return indexed
     strings=decode_descriptors(img)

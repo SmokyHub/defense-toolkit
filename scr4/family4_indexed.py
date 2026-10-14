@@ -59,7 +59,7 @@ def body(img, start, imported):
     return Code(seen[a] for a in sorted(seen))
 
 
-def shape(code, overrides):
+def shape(code, overrides, *, skip_padding=False):
     """Retain registers, predicates and constants; normalize only explicit sites."""
     positions = {i.address: k for k, i in enumerate(code)}
     rows = []
@@ -68,7 +68,10 @@ def shape(code, overrides):
             rows.append(overrides[k]); continue
         text = i.op_str
         if i.mnemonic == 'b' or i.mnemonic.startswith('b.') or i.mnemonic in ('cbz','cbnz','tbz','tbnz'):
-            text = re.sub(r'#[^, ]+$', '@' + str(positions[i.operands[-1].imm]), text)
+            target = i.operands[-1].imm
+            if skip_padding and target not in positions:
+                target = next((a for a in positions if a >= target), target)
+            text = re.sub(r'#[^, ]+$', '@' + str(positions[target]), text)
         rows.append(i.mnemonic + ' ' + text)
     return '\n'.join(rows)
 
@@ -76,6 +79,11 @@ def shape(code, overrides):
 def parameter_shape(ins, count):
     """Mask reviewed scalar operands only; retain opcodes, widths and shifts' kinds."""
     return ins.mnemonic + ' ' + re.sub(r'#-?(?:0x[0-9a-f]+|\d+)', '<parameter>', ins.op_str, count=count)
+
+
+def data_address_shape(ins):
+    """Normalize a reviewed page-relative data displacement, not its registers."""
+    return ins.mnemonic + ' ' + re.sub(r'#-?(?:0x[0-9a-f]+|\d+)', '<data-offset>', ins.op_str, count=1)
 
 
 def map_id(img, start, value, imported):
@@ -125,10 +133,14 @@ def map_id(img, start, value, imported):
     raise Unsupported('string-ID mapper budget exceeded')
 
 
-def verify_graph(img, root, model):
-    from family4_native import Unsupported, ARM64_OP_IMM
+def verify_graph(img, root, model, *, core=False):
+    from family4_native import Code, Unsupported, ARM64_OP_IMM, _canonical_shape
     imported = imports(img); bound = {}; codes = {}; references = {}; constants = {}
-    pending = [('entry', root)]
+    global_base = None
+    slots = {r['r_offset']:img.elf.get_section(sec['sh_link']).get_symbol(r['r_info_sym']).name
+             for sec in img.elf.iter_sections() if sec['sh_type']=='SHT_RELA'
+             for r in sec.iter_relocations() if r['r_info_type']==1026} if core else {}
+    pending = [('loader' if core else 'entry', root)]
     while pending:
         name, start = pending.pop()
         if name in bound:
@@ -136,10 +148,15 @@ def verify_graph(img, root, model):
             continue
         if start in bound.values(): raise Unsupported('aliased indexed helpers')
         bound[name] = start
+        if core and name == 'decoder':
+            continue  # Recovered independently by bounded isolated calls.
         if name == 'mapper':
             map_id(img,start,0,imported)
             continue
-        spec = model['functions'][name]; code = body(img,start,imported); codes[name] = code
+        spec = model['functions'][name]; code = body(img,start,imported)
+        if core:
+            code = Code(i for i in code if i.mnemonic not in ('nop','bti'))
+        codes[name] = code
         if len(code) != spec['instructions']: raise Unsupported('changed indexed helper length: ' + name)
         replacements = {}
         for key, edge in spec['edges'].items():
@@ -149,10 +166,12 @@ def verify_graph(img, root, model):
                 raise Unsupported('changed indexed reference operand')
             if i.mnemonic in ('adr', 'adrp'):
                 actual = i.mnemonic + ' ' + i.reg_name(i.operands[0].reg) + ', <address>'
-                if actual != edge['shape']:
+                if not core and actual != edge['shape']:
                     raise Unsupported('changed indexed address destination')
             target = i.operands[-1].imm
             replacements[k] = edge['shape']
+            if core and i.mnemonic in ('adr','adrp'):
+                replacements[k] = actual
             if 'import' in edge:
                 if imported.get(target) != edge['import']: raise Unsupported('changed indexed import')
             elif 'function' in edge:
@@ -170,7 +189,27 @@ def verify_graph(img, root, model):
         for key, count in spec.get('parameters', {}).items():
             k = int(key)
             replacements[k] = parameter_shape(code[k], count)
-        if hashlib.sha256(shape(code,replacements).encode()).hexdigest() != spec['shape_sha256']:
+        for key, use in spec.get('address_uses', {}).items():
+            k = int(key); ins = code[k]; base = code[use['base_instruction']]
+            if base.mnemonic != 'adrp':raise Unsupported('unmodeled data-page source')
+            offset = ins.operands[2].imm if ins.mnemonic=='add' else ins.operands[1].mem.disp
+            target = base.operands[1].imm + offset
+            if 'literal' in use:
+                expected = bytes.fromhex(use['literal'])
+                if img.read(target,len(expected)) != expected:raise Unsupported('changed core data literal')
+            elif 'import' in use:
+                if slots.get(target) != use['import']:raise Unsupported('changed core import slot')
+            else:
+                if not any(s['p_vaddr']<=target<s['p_vaddr']+s['p_memsz'] and s['p_flags']&2 for s in img.loads):
+                    raise Unsupported('core global outside writable ELF segment')
+                candidate = target-use['global_offset']
+                if global_base is None:global_base=candidate
+                if candidate!=global_base:raise Unsupported('inconsistent core global relocation')
+            replacements[k] = data_address_shape(ins)
+        observed = shape(code,replacements,skip_padding=core)
+        if core:
+            observed = _canonical_shape(observed, list(range(len(code))))
+        if observed is None or hashlib.sha256(observed.encode()).hexdigest() != spec['shape_sha256']:
             raise Unsupported('changed indexed instruction graph: ' + name)
     # Check immutable SIMD/scalar parser limits referenced through ADRP pages.
     for item in model['literals']:
@@ -192,6 +231,18 @@ def decoder_parameters(model, code=None):
         if not 0 <= lo <= 65535 or not 0 <= hi <= 65535:
             raise Unsupported('indexed decoder mask outside 32-bit model')
         return lo | (hi << 16)
+    if params.get('kind') == 'strided_lcg':
+        for key in ('offset_mask', 'length_mask', 'seed_mask', 'stride_mask', 'multiplier', 'increment'):
+            params[key] = word(sites[key])
+        if word(sites['counter_increment']) != params['increment']:
+            raise Unsupported('inconsistent strided state/counter increment')
+        params['index_mask'] = code[sites['index_mask']].operands[1].imm & 0xffff
+        rotate, width = (op.imm for op in code[sites['rotate_right']].operands[2:])
+        complement = code[sites['rotate_complement']].operands[2].shift.value
+        if not 1 <= rotate <= 7 or width != 8-rotate or complement != 8-rotate:
+            raise Unsupported('inconsistent strided byte rotation')
+        params['rotate_right'] = rotate
+        return params
     for key in ('offset_mask','length_mask','seed_mask'):
         params[key] = word(sites[key])
     params['index_mask'] = code[sites['index_mask']].operands[1].imm
@@ -213,6 +264,8 @@ def decoder_parameters(model, code=None):
 def decode_pool(img, addresses, model, imported, decoder_code=None):
     from family4_native import Unsupported
     decoder = decoder_parameters(model, decoder_code); refs = addresses
+    if decoder.get('kind') == 'strided_lcg':
+        return decode_strided_pool(img, refs, decoder)
     tables = [refs[('decoder', k)] for k in decoder['table_instructions']]
     offsets,seeds,addends,lengths,cipher = tables
     rows = []
@@ -239,10 +292,48 @@ def decode_pool(img, addresses, model, imported, decoder_code=None):
     return rows
 
 
+def decode_strided_pool(img, refs, params):
+    """Recover the checked ID -> record -> strided-byte LCG transform."""
+    from family4_native import Unsupported
+    mapping, records, cipher = [refs[('decoder', k)] for k in params['table_instructions']]
+    rows = []; total = 0
+    for identifier in range(params['count']):
+        index = struct.unpack('<H', img.read(mapping + identifier*2, 2))[0] ^ params['index_mask']
+        if not 0 <= index < params['count']:
+            raise Unsupported('strided string record index outside table')
+        record = records + index*20
+        size, start, seed, stride, salt = struct.unpack('<5I', img.read(record, 20))
+        size ^= params['length_mask']; start ^= params['offset_mask']; stride ^= params['stride_mask']
+        total += size
+        if (not 1 <= size <= 16384 or total > 1024*1024 or not 1 <= stride <= 3 or
+            start >= params['pool_size'] or start + (size-1)*stride >= params['pool_size']):
+            raise Unsupported('strided string metadata exceeds bounds')
+        state = seed ^ salt ^ params['seed_mask']; plain = bytearray()
+        for j in range(size):
+            state = (state * params['multiplier'] + params['increment']) & 0xffffffff
+            value = img.read(cipher + start + j*stride, 1)[0] ^ ((state + j) & 255)
+            rotation = params['rotate_right']
+            plain.append((((value >> rotation) | (value << (8-rotation))) - state) & 255)
+        try: text = plain.decode('utf-8')
+        except UnicodeError as error: raise Unsupported('strided plaintext is not UTF-8') from error
+        if any(ord(c)<32 or ord(c)==127 for c in text):
+            raise Unsupported('strided plaintext has control bytes')
+        storage = cipher + start
+        file_offset = next(s['p_offset']+storage-s['p_vaddr'] for s in img.loads
+                           if s['p_vaddr'] <= storage < s['p_vaddr']+s['p_filesz'])
+        rows.append({'index':identifier, 'record_index':index, 'record_va':hex(record),
+                     'mapping_va':hex(mapping+identifier*2), 'text':text, 'length':size,
+                     'storage_va':hex(storage), 'storage_stride':stride, 'file_offset':hex(file_offset),
+                     'decoder_va':None, 'decode_calls':[]})
+    return rows
+
+
 def analyze_indexed(img):
     results = []
-    for filename in ('family4_indexed_models.json', 'family4_indexed_rotated_models.json'):
-        model = json.loads(Path(__file__).with_name(filename).read_text())
+    for filename in ('family4_indexed_models.json', 'family4_indexed_rotated_models.json',
+                     'family4_strided_models.json'):
+        try:model = json.loads(Path(__file__).with_name(filename).read_text())
+        except FileNotFoundError:continue  # The independent core reader can operate alone.
         result = _analyze_model(img, model)
         if result is not None:
             results.append(result)
@@ -274,7 +365,8 @@ def _analyze_model(img, model):
                 call = codes[name][int(k)]
                 binding = spec['string_calls'][str(k)]
                 argument = constants[(name,binding['argument_instruction'])]
-                index = map_id(img,bound['mapper'],argument,imported)^params['index_mask']
+                index = (argument & 0xffff) if params.get('kind') == 'strided_lcg' else (
+                    map_id(img,bound['mapper'],argument,imported)^params['index_mask'])
                 if not 0 <= index < len(rows): raise Unsupported('unresolved indexed string call')
                 text = rows[index]['text']
                 patterns = {'endpoint':r'https?://[^\s]+','bridge_class':r'[A-Za-z_$][A-Za-z0-9_$/]*',
@@ -285,44 +377,52 @@ def _analyze_model(img, model):
                     valid = re.fullmatch(patterns[binding['kind']],text) is not None
                 if not valid: raise Unsupported('changed indexed string use: ' + hex(call.address))
                 rows[index]['decode_calls'].append({'call_va':hex(call.address),'string_id':argument})
-        table = refs[('selectors',model['selector_table_instruction'])]
-        keys = struct.unpack('<16Q',img.read(table,128))
-        if len(set(keys[1:])) != 15 or not all(0 < x < 10**12 for x in keys): raise Unsupported('invalid indexed selectors')
-        outer = constants[tuple(model['outer_selector_site'])]
-        if outer != keys[0]: raise Unsupported('indexed trigger/parser selector mismatch')
-        guard_model, helpers = _validator_model(img,img.function(bound['validator']))
-        if not guard_model: raise Unsupported('unmodeled indexed DEX validator')
-        roles = {role:str(keys[index+1]) for role,index in model['role_indices'].items()}
-        # Emit fresh call addresses from the checked loader body and its frame arguments.
-        evidence = []
-        for k, i in enumerate(codes['loader']):
-            slot = _jni_slot(codes['loader'],k)
-            if slot in (0x108,0x388):
-                a,b = _stack_source(codes['loader'],k,'x2'),_stack_source(codes['loader'],k,'x3')
-                anchor = model['context_fields_offset']
-                def key(off):
-                    if off is not None and 0 <= off-anchor < 240 and (off-anchor)%16==0:
-                        return str(keys[1+(off-anchor)//16])
-                if key(a) and key(b): evidence.append({'jni_slot':hex(slot),'name_key':key(a),'signature_key':key(b),'call_va':hex(i.address)})
-        if len(evidence) != 6: raise Unsupported('incomplete indexed JNI argument binding')
-        values = {r['text'] for r in rows}; endpoints = [r['text'] for r in rows if re.fullmatch(r'https?://[^\s]+',r['text'])]
-        required = {'java/nio/ByteBuffer','allocateDirect','java/lang/ClassLoader','org/json/JSONObject','getResponseCode','POST','<init>'}
-        if not required <= values or len(endpoints) != 1: raise Unsupported('incomplete indexed strings/endpoint')
-        contract = {'outer_key':str(outer),'array_key':str(keys[2]),'roles':roles,'complete':True,
-                    'table_va':hex(table),'parser_va':hex(bound['parser']),'loader_va':hex(bound['loader']),
-                    'dex_validator_va':hex(bound['validator']),'validator_model':guard_model,'validator_helpers':helpers,
-                    'role_evidence':evidence,'outer_trigger_evidence':[{'value':str(outer),'literal_va':hex(codes[model['outer_selector_site'][0]][model['outer_selector_site'][1]].address)}],
-                    'diagnostics':[], 'guards':{'dex_min_bytes':112,'dex_max_bytes':33554432,
-                    'dex_versions':['035','037','038','039','040','041'],'exact_file_size':True,
-                    'header_and_table_bounds':True,'dex_checksum_checked_by_native':False},
-                    'additional_checks':'Reviewed JSON preflight, allocation budgets, descriptor syntax and JNI type/assignability checks; conditional static contract.'}
-        return {'family':'family4','variant':'indexed_string_pool','status':'supported',
-                'decoder_transform': {k:params[k] for k in ('xorshift','subtract_state_shift','xor_state_shift','rotate_right')},
-                'sha256':hashlib.sha256(img.data).hexdigest(),'endpoint':endpoints[0],'http_method':'POST',
-                'strings':rows,'contracts':[contract],'diagnostics':[],
-                'analysis_stages':[{'stage':'indexed_instruction_graph','status':'observed','candidate_count':len(bound)}],
-                'evidence_level':'static_reconstruction_and_JNI_argument_binding','runtime_execution_observed':False,
-                'limitations':['Compiler-scoped instruction graph; changed layouts or decoder instructions require review. No runtime execution observed.']}
+        return finish_contract(img, model, bound, codes, refs, constants, rows, params)
     except (Unsupported,ValueError,struct.error,KeyError) as error:
         return {'family':'family4','variant':'indexed_string_pool','status':'needs_review',
                 'strings':[], 'contracts':[], 'diagnostics':[str(error)],'runtime_execution_observed':False}
+
+
+def finish_contract(img, model, bound, codes, refs, constants, rows, params, outer_evidence=None):
+    from family4_native import Unsupported, _validator_model, _jni_slot, _stack_source
+    table = refs[('selectors',model['selector_table_instruction'])]
+    keys = struct.unpack('<16Q',img.read(table,128))
+    if len(set(keys[1:])) != 15 or not all(0 <= x < 10**12 for x in keys): raise Unsupported('invalid indexed selectors')
+    outer = keys[0] if outer_evidence is not None else constants[tuple(model['outer_selector_site'])]
+    if outer != keys[0]: raise Unsupported('indexed trigger/parser selector mismatch')
+    guard_model, helpers = _validator_model(img,img.function(bound['validator']))
+    if not guard_model: raise Unsupported('unmodeled indexed DEX validator')
+    roles = {role:str(keys[index+1]) for role,index in model['role_indices'].items()}
+    # Emit fresh call addresses from the checked loader body and its frame arguments.
+    evidence = []
+    for k, i in enumerate(codes['loader']):
+        slot = _jni_slot(codes['loader'],k)
+        if slot in (0x108,0x388):
+            a,b = _stack_source(codes['loader'],k,'x2'),_stack_source(codes['loader'],k,'x3')
+            anchor = model['context_fields_offset']
+            def key(off):
+                if off is not None and 0 <= off-anchor < 240 and (off-anchor)%16==0:
+                    return str(keys[1+(off-anchor)//16])
+            if key(a) and key(b): evidence.append({'jni_slot':hex(slot),'name_key':key(a),'signature_key':key(b),'call_va':hex(i.address)})
+    if len(evidence) != 6: raise Unsupported('incomplete indexed JNI argument binding')
+    values = {r['text'] for r in rows}; endpoints = [r['text'] for r in rows if re.fullmatch(r'https?://[^\s]+',r['text'])]
+    required = {'java/nio/ByteBuffer','allocateDirect','java/lang/ClassLoader','org/json/JSONObject','getResponseCode','POST','<init>'}
+    if not required <= values or len(endpoints) != 1: raise Unsupported('incomplete indexed strings/endpoint')
+    contract = {'outer_key':str(outer),'array_key':str(keys[2]),'roles':roles,'complete':True,
+                'table_va':hex(table),'parser_va':hex(bound['parser']),'loader_va':hex(bound['loader']),
+                'dex_validator_va':hex(bound['validator']),'validator_model':guard_model,'validator_helpers':helpers,
+                'role_evidence':evidence,'outer_trigger_evidence':outer_evidence if outer_evidence is not None else [{'value':str(outer),'literal_va':hex(codes[model['outer_selector_site'][0]][model['outer_selector_site'][1]].address)}],
+                'diagnostics':[], 'guards':{'dex_min_bytes':112,'dex_max_bytes':33554432,
+                'dex_versions':['035','037','038','039','040','041'],'exact_file_size':True,
+                'header_and_table_bounds':True,'dex_checksum_checked_by_native':False},
+                'additional_checks':'Reviewed JSON preflight, allocation budgets, descriptor syntax and JNI type/assignability checks; conditional static contract.'}
+    strided = params.get('kind') == 'strided_lcg'
+    transform_keys = () if params.get('kind')=='isolated' else ('multiplier','increment','rotate_right') if strided else (
+        'xorshift','subtract_state_shift','xor_state_shift','rotate_right')
+    return {'family':'family4','variant':'indexed_strided_string_pool' if strided else 'indexed_string_pool','status':'supported',
+            'decoder_transform': {k:params[k] for k in transform_keys},
+            'sha256':hashlib.sha256(img.data).hexdigest(),'endpoint':endpoints[0],'http_method':'POST',
+            'strings':rows,'contracts':[contract],'diagnostics':[],
+            'analysis_stages':[{'stage':'indexed_instruction_graph','status':'observed','candidate_count':len(bound)}],
+            'evidence_level':'static_reconstruction_and_JNI_argument_binding','runtime_execution_observed':False,
+            'limitations':['Compiler-scoped instruction graph; changed layouts or decoder instructions require review. No runtime execution observed.']}
