@@ -182,6 +182,7 @@ XOR_ANCHORS = (
     b'dalvik/system/InMemoryDexClassLoader', b'android/content/res/AssetManager',
     b'dalvik/system/PathClassLoader', b'dalvik/system/DexClassLoader',
     b'java/net/HttpURLConnection', b'java/lang/ClassLoader', b'java/nio/ByteBuffer',
+    b'()Landroid/content/res/AssetManager;', b'getAssets',
 )
 
 XOR_TABLES = tuple(bytes(i ^ key for i in range(256)) for key in range(256))

@@ -694,6 +694,7 @@ class Reconstructor:
         self.transforms_jsonl = JsonlWriter(output_dir / "transforms.jsonl")
 
         self.original = bytearray(metadata.path.read_bytes())
+        self.input_sha256 = sha256_hex(bytes(self.original))
         self.patched = bytearray(self.original)
         self.loader_path = metadata.path
         self.runtime_error: Optional[str] = None
@@ -821,23 +822,66 @@ class Reconstructor:
     def xor_anchors(self) -> tuple[bytes, ...]:
         return tuple(dict.fromkeys((*XOR_ANCHORS, *(a.encode('utf-8') for a in self.args.xor_anchor))))
 
-    def discover_static_strings(self) -> None:
+    def file_offset_to_va(self, offset: int) -> Optional[int]:
+        for seg in self.metadata.load_segments:
+            if seg.file_offset <= offset < seg.file_offset + seg.file_size:
+                return seg.virtual_address + offset - seg.file_offset
+        return None
+
+    def discover_static_strings(self, *, post_init: bool = False) -> None:
+        """Corroborated decoding of original or constructor-prepared file bytes.
+
+        The second pass does not execute the lazy decoder or establish that a
+        recovered API was called. It uses the same evidence requirements as the
+        original pass, and retains the initialization outcome independently.
+        """
         if not self.args.discover_xor_keys:
             return
-        raw = bytes(self.original)
+        if post_init:
+            if self.args.static_only or not self.current_snapshot:
+                return
+            # Use a coherent memory snapshot, not the analysis overlay, which
+            # can also retain transient plaintext from earlier decoder calls.
+            prepared = bytearray(self.original)
+            for seg in self.metadata.load_segments:
+                data = self.current_snapshot.get(seg.index, b'')[:seg.file_size]
+                prepared[seg.file_offset:seg.file_offset + len(data)] = data
+            if prepared == self.original:
+                return
+            raw = bytes(prepared)
+        else:
+            raw = bytes(self.original)
+        stage = 'post-init-xor' if post_init else 'static-xor'
         for key, evidence in discover_xor_keys(
             raw, lengths=self.args.xor_key_lengths, anchors=self.xor_anchors(),
             max_keys=self.args.max_xor_keys,
         ):
             digest = sha256_hex(key)
-            record = {'type': 'validated-static-xor-key', 'key_length': len(key),
-                      'key_sha256': digest, **evidence}
+            for match in evidence['anchor_matches']:
+                match['elf_va'] = self.file_offset_to_va(match['file_offset'])
+            key_offset = evidence['stored_key_file_offset']
+            record = {'type': f'validated-{stage}-key', 'key_length': len(key),
+                      'key_sha256': digest, **evidence, 'source_stage': stage,
+                      'input': str(self.metadata.path), 'input_sha256': self.input_sha256,
+                      'stored_key_elf_va': (self.file_offset_to_va(key_offset)
+                                            if key_offset is not None else None),
+                      'constructors_complete': (bool(self.function_results) and
+                                               all(r['success'] for r in self.function_results)
+                                               if post_init else None)}
             self.events.write(record)
             self.xor_discoveries.append(record)
-            print(f"[+] Corroborated {len(key)}-byte XOR key: {len(evidence['anchor_matches'])} anchors")
+            print(f"[+] {stage}: corroborated {len(key)}-byte XOR key: {len(evidence['anchor_matches'])} anchors")
+            # Preserve exact anchor bounds/locations alongside general sweeps,
+            # which can join a name to unrelated printable neighboring bytes.
+            for match in evidence['anchor_matches']:
+                self.add_candidate(CandidateString(
+                    text=match['anchor'], encoding='utf-8',
+                    source=f"{stage}:{digest[:16]}:anchor:phase:{match['phase']}",
+                    file_offset=match['file_offset'], elf_va=match['elf_va'],
+                ))
             for phase in range(len(key)):
                 self.scan_bytes(xor_bytes(raw, key, phase),
-                                source=f"static-xor:{digest[:16]}:phase:{phase}",
+                                source=f"{stage}:{digest[:16]}:phase:{phase}",
                                 file_base=0)
 
     def _register_symbol_addresses(self) -> None:
@@ -921,6 +965,7 @@ class Reconstructor:
         self.candidates[key] = candidate
 
         record = dataclasses.asdict(candidate)
+        record.update(input=str(self.metadata.path), input_sha256=self.input_sha256)
         self.strings_jsonl.write(record)
 
         address_text = ""
@@ -932,7 +977,7 @@ class Reconstructor:
         transient_text = " transient" if candidate.transient else ""
         print(
             f"[string]{transient_text}{address_text} "
-            f"[{candidate.encoding}] {candidate.text}"
+            f"[{candidate.encoding}] [{candidate.source}] {candidate.text}"
         )
 
     def scan_bytes(
@@ -959,6 +1004,7 @@ class Reconstructor:
 
             if file_base is not None:
                 file_offset = file_base + offset
+                elf_va = self.file_offset_to_va(file_offset)
 
             if runtime_address is not None and self.is_module_address(
                 runtime_address
@@ -996,6 +1042,7 @@ class Reconstructor:
 
             if file_base is not None:
                 file_offset = file_base + offset
+                elf_va = self.file_offset_to_va(file_offset)
 
             if runtime_address is not None and self.is_module_address(
                 runtime_address
@@ -3408,6 +3455,8 @@ class Reconstructor:
             location = ""
             if candidate.file_offset is not None:
                 location = f"file={candidate.file_offset:#x}"
+                if candidate.elf_va is not None:
+                    location += f" va={candidate.elf_va:#x}"
             elif candidate.elf_va is not None:
                 location = f"va={candidate.elf_va:#x}"
             elif candidate.runtime_address is not None:
@@ -3496,7 +3545,8 @@ class Reconstructor:
             for candidate in self.candidates.values():
                 match = re.search(pattern, candidate.text, re.IGNORECASE)
                 if match:
-                    kind = ('static-xor' if candidate.source.startswith(('static-xor:', 'xor-phase:'))
+                    kind = ('post-init-xor' if candidate.source.startswith('post-init-xor:')
+                            else 'static-xor' if candidate.source.startswith(('static-xor:', 'xor-phase:'))
                             else 'static-file' if candidate.source == 'full-patched-analysis-elf'
                             else 'runtime-memory')
                     records.append({'text': candidate.text, 'source': candidate.source,
@@ -3505,11 +3555,16 @@ class Reconstructor:
                                     'match_file_offset': (candidate.file_offset + match.start() *
                                                           (2 if candidate.encoding == 'utf-16le' else 1)
                                                           if candidate.file_offset is not None else None),
-                                    'elf_va': candidate.elf_va, 'function': candidate.function})
+                                    'elf_va': candidate.elf_va,
+                                    'match_elf_va': (candidate.elf_va + match.start() *
+                                                     (2 if candidate.encoding == 'utf-16le' else 1)
+                                                     if candidate.elf_va is not None else None),
+                                    'function': candidate.function})
             signals[label] = {'found': bool(records), 'evidence': records}
         self.signals_complete = all(record['found'] for record in signals.values())
         (self.output_dir / 'signals.json').write_text(json.dumps({
             'all_found': self.signals_complete, 'signals': signals,
+            'input': str(self.metadata.path), 'input_sha256': self.input_sha256,
             'note': 'String evidence does not establish execution or maliciousness by itself.',
         }, indent=2) + '\n')
         print('[+] Target references: ' + ', '.join(f"{name}={'found' if value['found'] else 'missing'}"
@@ -4108,7 +4163,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument('--static-only', action='store_true',
                         help='Recover static strings and corroborated XOR keys without running constructors')
     parser.add_argument('--discover-xor-keys', action=argparse.BooleanOptionalAction, default=True,
-                        help='Discover multiple independently corroborated periodic XOR keys (default: true)')
+                        help='Discover corroborated XOR keys in original and post-initialization bytes (default: true)')
     parser.add_argument('--xor-key-lengths', type=lambda value: tuple(int(v, 0) for v in value.split(',')),
                         default=(1, 2, 4, 8, 16, 32), help='Comma-separated key lengths for static discovery')
     parser.add_argument('--xor-anchor', action='append', default=[],
@@ -4217,6 +4272,11 @@ def main() -> int:
                     traceback.print_exc()
         elif args.xor_key_hex or args.xor_key_va is not None:
             reconstructor.run_optional_xor_sweep()
+
+        # Keep any recovered bytes even if initialization was partial. Their
+        # evidence stage and constructor completion are recorded separately.
+        if not args.static_only:
+            reconstructor.discover_static_strings(post_init=True)
 
         output_elf, strings_path = reconstructor.write_outputs()
 
