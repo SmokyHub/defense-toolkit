@@ -32,7 +32,69 @@ def imports(img):
     return result
 
 
-def body(img, start, imported):
+def byte_switch(img, start, branch):
+    """Recover a bounded, guarded ARM64 byte-offset jump table.
+
+    Only used with a reviewed graph: its normalized instructions and the ordered
+    destinations are checked separately, including the local ADR base binding.
+    """
+    from family4_native import Unsupported, ARM64_OP_IMM, ARM64_OP_MEM, ARM64_OP_REG
+    seq=[img.byaddr.get(branch.address-4*k) for k in range(3,-1,-1)]
+    if any(i is None for i in seq):return None
+    if [i.mnemonic for i in seq]!=['adr','ldrb','add','br']:return None
+    base,load,add,jump=seq
+    reg=lambda ins,op:ins.reg_name(op.reg)
+    family=lambda name:name.replace('w','x',1)
+    mem=load.operands[1]
+    if mem.type!=ARM64_OP_MEM or not mem.mem.index:return None
+    index=family(load.reg_name(mem.mem.index))
+    target=reg(base,base.operands[0]);scratch=family(reg(load,load.operands[0]))
+    if (mem.mem.disp or load.writeback
+            or len(add.operands)!=3 or any(op.type!=ARM64_OP_REG for op in add.operands)
+            or [reg(add,op) for op in add.operands]!=[target,target,scratch]
+            or add.operands[2].shift.value!=2 or add.operands[2].shift.type!=1
+            or reg(jump,jump.operands[0])!=target):
+        raise Unsupported('unmodeled byte-switch operands')
+    table_register=load.reg_name(mem.mem.base)
+    preceding=img.byaddr.get(base.address-4)
+    local_table=(preceding is not None and preceding.mnemonic=='adr'
+                 and reg(preceding,preceding.operands[0])==table_register)
+    if local_table:
+        writers=[preceding]
+        landing={preceding.address}
+        cursor=preceding.address-4
+        while cursor in img.byaddr and img.byaddr[cursor].mnemonic in ('nop','bti'):
+            landing.add(cursor);cursor-=4
+        guards=[i for i in img.ins if start<=i.address<preceding.address
+                and i.mnemonic=='b.ls' and i.operands[0].imm in landing]
+    else:
+        if table_register not in {f'x{k}' for k in range(19,29)}:
+            raise Unsupported('byte-switch table is not in a preserved register')
+        writers=[i for i in img.ins if start<=i.address<branch.address
+                 and table_register in {family(i.reg_name(r)) for r in i.regs_access()[1]}]
+        guards=[preceding] if preceding is not None and preceding.mnemonic=='b.hi' else []
+    if len(guards)!=1:raise Unsupported('ambiguous byte-switch guard')
+    cmp=img.byaddr.get(guards[0].address-4)
+    if (cmp is None or cmp.mnemonic!='cmp' or len(cmp.operands)!=2
+            or cmp.operands[0].type!=ARM64_OP_REG
+            or family(reg(cmp,cmp.operands[0]))!=index
+            or cmp.operands[1].type!=ARM64_OP_IMM or not 0<=cmp.operands[1].imm<32):
+        raise Unsupported('unmodeled byte-switch bound')
+    count=cmp.operands[1].imm+1
+    if (len(writers)!=1 or writers[0].mnemonic!='adr'
+            or writers[0].operands[1].type!=ARM64_OP_IMM):
+        raise Unsupported('ambiguous byte-switch table source')
+    table=writers[0].operands[1].imm
+    if not any(not s['p_flags']&2 and s['p_vaddr']<=table
+               and table+count<=s['p_vaddr']+s['p_filesz'] for s in img.loads):
+        raise Unsupported('byte-switch table is not read-only')
+    targets=[base.operands[1].imm+4*b for b in img.read(table,count)]
+    if any(t not in img.byaddr or not start<=t<start+65536 for t in targets):
+        raise Unsupported('byte-switch destination outside helper bounds')
+    return {'targets':targets,'table_va':table,'table_instruction_va':writers[0].address}
+
+
+def body(img, start, imported, *, tail_calls=False, byte_switches=False):
     from family4_native import Code, Unsupported, ARM64_OP_IMM
     pending = [start]; seen = {}
     while pending:
@@ -45,9 +107,19 @@ def body(img, start, imported):
         if ins is None:
             raise Unsupported('indexed helper reaches undecoded code')
         seen[va] = ins
+        if ins.mnemonic == 'br' and byte_switches:
+            switch=byte_switch(img,start,ins)
+            if switch:pending.extend(switch['targets'])
         if ins.mnemonic in ('ret', 'br'):
             continue
         if ins.mnemonic == 'bl' and imported.get(ins.operands[0].imm) in ('__stack_chk_fail', 'abort'):
+            continue
+        # Reviewed outlined wrappers may tail-call a separately verified helper.
+        # Leave that target to verify_graph instead of folding a backwards jump
+        # into this function's bounded body.
+        if (tail_calls and ins.mnemonic == 'b' and ins.operands[0].type == ARM64_OP_IMM
+                and ins.operands[0].imm != start
+                and (ins.operands[0].imm in img.starts or ins.operands[0].imm in imported)):
             continue
         if ins.mnemonic == 'b' or ins.mnemonic.startswith('b.') or ins.mnemonic in ('cbz','cbnz','tbz','tbnz'):
             if ins.operands[-1].type != ARM64_OP_IMM:
@@ -153,7 +225,9 @@ def verify_graph(img, root, model, *, core=False):
         if name == 'mapper':
             map_id(img,start,0,imported)
             continue
-        spec = model['functions'][name]; code = body(img,start,imported)
+        spec = model['functions'][name]
+        code = body(img,start,imported,tail_calls=model.get('tail_calls',False),
+                    byte_switches=model.get('byte_switches',False))
         if core:
             code = Code(i for i in code if i.mnemonic not in ('nop','bti'))
         codes[name] = code
@@ -172,7 +246,12 @@ def verify_graph(img, root, model, *, core=False):
             replacements[k] = edge['shape']
             if core and i.mnemonic in ('adr','adrp'):
                 replacements[k] = actual
-            if 'import' in edge:
+            if 'local_instruction' in edge:
+                while target in img.byaddr and img.byaddr[target].mnemonic in ('nop','bti'):
+                    target+=4
+                if target!=code[edge['local_instruction']].address:
+                    raise Unsupported('changed local instruction reference')
+            elif 'import' in edge:
                 if imported.get(target) != edge['import']: raise Unsupported('changed indexed import')
             elif 'function' in edge:
                 pending.append((edge['function'], target))
@@ -206,6 +285,22 @@ def verify_graph(img, root, model, *, core=False):
                 if global_base is None:global_base=candidate
                 if candidate!=global_base:raise Unsupported('inconsistent core global relocation')
             replacements[k] = data_address_shape(ins)
+        if model.get('byte_switches'):
+            switches={}
+            positions={i.address:k for k,i in enumerate(code)}
+            for k,ins in enumerate(code):
+                if ins.mnemonic!='br':continue
+                switch=byte_switch(img,start,ins)
+                if switch:
+                    destinations=[]
+                    for target in switch['targets']:
+                        while target in img.byaddr and img.byaddr[target].mnemonic in ('nop','bti'):
+                            target+=4
+                        if target not in positions:raise Unsupported('unresolved byte-switch destination')
+                        destinations.append(positions[target])
+                    switches[str(k)]=destinations
+            if switches!=spec.get('switches',{}):
+                raise Unsupported('changed byte-switch destinations')
         observed = shape(code,replacements,skip_padding=core)
         if core:
             observed = _canonical_shape(observed, list(range(len(code))))

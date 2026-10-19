@@ -23,7 +23,8 @@ def analyze_core(img):
         return {'family':'family4','status':'needs_review','contracts':[],'strings':[],
                 'diagnostics':['core candidate budget exceeded']}
     results=[]
-    for filename in ('family4_core_models.json', 'family4_core_inlined_models.json'):
+    for filename in ('family4_core_models.json', 'family4_core_inlined_models.json',
+                     'family4_core_outlined_models.json'):
         model=json.loads(Path(__file__).with_name(filename).read_text())
         result=_analyze_core_model(img,candidates,model)
         if result is not None:

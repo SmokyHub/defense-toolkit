@@ -1,0 +1,3066 @@
+{
+  "format": "apk-defense.family4-core-model/v1",
+  "functions": {
+    "loader": {
+      "instructions": 662,
+      "edges": {
+        "24": {
+          "mnemonic": "adr",
+          "shape": "adr x0, <address>"
+        },
+        "25": {
+          "mnemonic": "bl",
+          "function": "helper_5",
+          "shape": "bl function:helper_5"
+        },
+        "36": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        },
+        "40": {
+          "mnemonic": "bl",
+          "function": "helper_6",
+          "shape": "bl function:helper_6"
+        },
+        "46": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        },
+        "48": {
+          "mnemonic": "bl",
+          "function": "validator",
+          "shape": "bl function:validator"
+        },
+        "52": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "56": {
+          "mnemonic": "bl",
+          "function": "helper_7",
+          "shape": "bl function:helper_7"
+        },
+        "61": {
+          "mnemonic": "adr",
+          "shape": "adr x26, <address>",
+          "literal": "00"
+        },
+        "64": {
+          "mnemonic": "bl",
+          "import": "memcmp",
+          "shape": "bl import:memcmp"
+        },
+        "67": {
+          "mnemonic": "bl",
+          "function": "helper_8",
+          "shape": "bl function:helper_8"
+        },
+        "71": {
+          "mnemonic": "bl",
+          "function": "helper_9",
+          "shape": "bl function:helper_9"
+        },
+        "74": {
+          "mnemonic": "bl",
+          "function": "helper_9",
+          "shape": "bl function:helper_9"
+        },
+        "78": {
+          "mnemonic": "bl",
+          "function": "helper_9",
+          "shape": "bl function:helper_9"
+        },
+        "81": {
+          "mnemonic": "bl",
+          "function": "helper_9",
+          "shape": "bl function:helper_9"
+        },
+        "93": {
+          "mnemonic": "bl",
+          "function": "helper_10",
+          "shape": "bl function:helper_10"
+        },
+        "99": {
+          "mnemonic": "bl",
+          "function": "helper_10",
+          "shape": "bl function:helper_10"
+        },
+        "107": {
+          "mnemonic": "bl",
+          "function": "helper_10",
+          "shape": "bl function:helper_10"
+        },
+        "113": {
+          "mnemonic": "bl",
+          "function": "helper_10",
+          "shape": "bl function:helper_10"
+        },
+        "121": {
+          "mnemonic": "bl",
+          "function": "helper_10",
+          "shape": "bl function:helper_10"
+        },
+        "127": {
+          "mnemonic": "bl",
+          "function": "helper_10",
+          "shape": "bl function:helper_10"
+        },
+        "130": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "132": {
+          "mnemonic": "bl",
+          "function": "helper_12",
+          "shape": "bl function:helper_12"
+        },
+        "151": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "152": {
+          "mnemonic": "bl",
+          "function": "helper_13",
+          "shape": "bl function:helper_13"
+        },
+        "157": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "158": {
+          "mnemonic": "bl",
+          "function": "helper_12",
+          "shape": "bl function:helper_12"
+        },
+        "166": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "167": {
+          "mnemonic": "bl",
+          "function": "helper_13",
+          "shape": "bl function:helper_13"
+        },
+        "172": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "173": {
+          "mnemonic": "bl",
+          "function": "helper_12",
+          "shape": "bl function:helper_12"
+        },
+        "182": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "183": {
+          "mnemonic": "bl",
+          "function": "helper_13",
+          "shape": "bl function:helper_13"
+        },
+        "188": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "189": {
+          "mnemonic": "bl",
+          "function": "helper_12",
+          "shape": "bl function:helper_12"
+        },
+        "227": {
+          "mnemonic": "bl",
+          "function": "helper_14",
+          "shape": "bl function:helper_14"
+        },
+        "242": {
+          "mnemonic": "bl",
+          "function": "helper_15",
+          "shape": "bl function:helper_15"
+        },
+        "247": {
+          "mnemonic": "bl",
+          "function": "helper_16",
+          "shape": "bl function:helper_16"
+        },
+        "256": {
+          "mnemonic": "bl",
+          "function": "helper_12",
+          "shape": "bl function:helper_12"
+        },
+        "261": {
+          "mnemonic": "bl",
+          "function": "helper_17",
+          "shape": "bl function:helper_17"
+        },
+        "268": {
+          "mnemonic": "bl",
+          "function": "helper_18",
+          "shape": "bl function:helper_18"
+        },
+        "276": {
+          "mnemonic": "bl",
+          "function": "helper_17",
+          "shape": "bl function:helper_17"
+        },
+        "278": {
+          "mnemonic": "bl",
+          "function": "helper_12",
+          "shape": "bl function:helper_12"
+        },
+        "290": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "293": {
+          "mnemonic": "bl",
+          "function": "helper_19",
+          "shape": "bl function:helper_19"
+        },
+        "294": {
+          "mnemonic": "bl",
+          "function": "helper_12",
+          "shape": "bl function:helper_12"
+        },
+        "299": {
+          "mnemonic": "bl",
+          "function": "helper_12",
+          "shape": "bl function:helper_12"
+        },
+        "317": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        },
+        "319": {
+          "mnemonic": "bl",
+          "function": "helper_12",
+          "shape": "bl function:helper_12"
+        },
+        "324": {
+          "mnemonic": "bl",
+          "function": "helper_12",
+          "shape": "bl function:helper_12"
+        },
+        "354": {
+          "mnemonic": "bl",
+          "function": "helper_20",
+          "shape": "bl function:helper_20"
+        },
+        "370": {
+          "mnemonic": "bl",
+          "function": "helper_17",
+          "shape": "bl function:helper_17"
+        },
+        "377": {
+          "mnemonic": "bl",
+          "function": "helper_18",
+          "shape": "bl function:helper_18"
+        },
+        "395": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "401": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "413": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "415": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "416": {
+          "mnemonic": "bl",
+          "function": "helper_12",
+          "shape": "bl function:helper_12"
+        },
+        "427": {
+          "mnemonic": "bl",
+          "function": "helper_16",
+          "shape": "bl function:helper_16"
+        },
+        "444": {
+          "mnemonic": "bl",
+          "function": "helper_17",
+          "shape": "bl function:helper_17"
+        },
+        "480": {
+          "mnemonic": "bl",
+          "import": "memcpy",
+          "shape": "bl import:memcpy"
+        },
+        "486": {
+          "mnemonic": "bl",
+          "function": "helper_15",
+          "shape": "bl function:helper_15"
+        },
+        "509": {
+          "mnemonic": "bl",
+          "function": "helper_21",
+          "shape": "bl function:helper_21"
+        },
+        "525": {
+          "mnemonic": "bl",
+          "function": "helper_17",
+          "shape": "bl function:helper_17"
+        },
+        "546": {
+          "mnemonic": "bl",
+          "function": "helper_14",
+          "shape": "bl function:helper_14"
+        },
+        "562": {
+          "mnemonic": "bl",
+          "function": "helper_15",
+          "shape": "bl function:helper_15"
+        },
+        "567": {
+          "mnemonic": "bl",
+          "function": "helper_20",
+          "shape": "bl function:helper_20"
+        },
+        "577": {
+          "mnemonic": "bl",
+          "function": "helper_12",
+          "shape": "bl function:helper_12"
+        },
+        "582": {
+          "mnemonic": "bl",
+          "function": "helper_17",
+          "shape": "bl function:helper_17"
+        },
+        "589": {
+          "mnemonic": "bl",
+          "function": "helper_18",
+          "shape": "bl function:helper_18"
+        },
+        "610": {
+          "mnemonic": "bl",
+          "function": "helper_21",
+          "shape": "bl function:helper_21"
+        },
+        "625": {
+          "mnemonic": "bl",
+          "function": "helper_15",
+          "shape": "bl function:helper_15"
+        },
+        "647": {
+          "mnemonic": "bl",
+          "function": "helper_22",
+          "shape": "bl function:helper_22"
+        },
+        "648": {
+          "mnemonic": "bl",
+          "function": "helper_12",
+          "shape": "bl function:helper_12"
+        }
+      },
+      "constants": [
+        51,
+        150,
+        165,
+        181,
+        394,
+        397
+      ],
+      "string_calls": {
+        "52": {
+          "argument_instruction": 51,
+          "kind": "literal",
+          "text": "<init>"
+        },
+        "151": {
+          "argument_instruction": 150,
+          "kind": "literal",
+          "text": "java/lang/Class"
+        },
+        "166": {
+          "argument_instruction": 165,
+          "kind": "literal",
+          "text": "java/lang/ClassLoader"
+        },
+        "182": {
+          "argument_instruction": 181,
+          "kind": "literal",
+          "text": "java/nio/ByteBuffer"
+        },
+        "395": {
+          "argument_instruction": 394,
+          "kind": "literal",
+          "text": "allocateDirect"
+        },
+        "401": {
+          "argument_instruction": 397,
+          "kind": "literal",
+          "text": "(I)Ljava/nio/ByteBuffer;"
+        }
+      },
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "5f41c29cd310741b25049586247a01e122185cf307e4a52e87988b1d75005904"
+    },
+    "helper_12": {
+      "instructions": 3,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "fdac83bd2128ba0244bdeb9f0f50a1b37e0e692b18f18c2f6949a472ca9fcc16"
+    },
+    "helper_22": {
+      "instructions": 15,
+      "edges": {
+        "3": {
+          "mnemonic": "bl",
+          "function": "helper_23",
+          "shape": "bl function:helper_23"
+        },
+        "7": {
+          "mnemonic": "bl",
+          "function": "helper_24",
+          "shape": "bl function:helper_24"
+        },
+        "14": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "ed99f7e7b4385eecb018abee64585de3f1fe24dc99782f5e85582a524bae7ab5"
+    },
+    "helper_24": {
+      "instructions": 4,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "ed4e41b545c0129d7b021797c69e043f42d49fa3905a7c6d2bbc0743c1de5008"
+    },
+    "helper_23": {
+      "instructions": 26,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "de85f08a29cb9a6b6a5eb4744d22d0c2d0eea98eb74799628f3be422eb4e418b"
+    },
+    "helper_15": {
+      "instructions": 33,
+      "edges": {
+        "11": {
+          "mnemonic": "bl",
+          "function": "helper_18",
+          "shape": "bl function:helper_18"
+        },
+        "32": {
+          "mnemonic": "b",
+          "function": "helper_18",
+          "shape": "b function:helper_18"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "3d4cc63f11c4949d5b99f702a74c7376dc8395033a355031c6cdcc63f31d22ec"
+    },
+    "helper_18": {
+      "instructions": 68,
+      "edges": {
+        "13": {
+          "mnemonic": "bl",
+          "function": "helper_25",
+          "shape": "bl function:helper_25"
+        },
+        "19": {
+          "mnemonic": "bl",
+          "import": "memcpy",
+          "shape": "bl import:memcpy"
+        },
+        "60": {
+          "mnemonic": "bl",
+          "function": "helper_26",
+          "shape": "bl function:helper_26"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "6a97f6e3ba5d5d35c83ca61cd6a03a23780206b46b13f1150b16728245c49239"
+    },
+    "helper_26": {
+      "instructions": 24,
+      "edges": {
+        "12": {
+          "mnemonic": "bl",
+          "function": "helper_27",
+          "shape": "bl function:helper_27"
+        },
+        "14": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "7eeca5b20c35fe9fb155f4ff74e93782ff8cbc1f09c442652bbf9b6bc4536b93"
+    },
+    "helper_27": {
+      "instructions": 5,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "54a5dee3ad3d4a76fb650dcb412cf2fdc800883cbb3bd7716d6ba53c8015b353"
+    },
+    "helper_25": {
+      "instructions": 32,
+      "edges": {
+        "13": {
+          "mnemonic": "bl",
+          "function": "helper_28",
+          "shape": "bl function:helper_28"
+        },
+        "16": {
+          "mnemonic": "bl",
+          "import": "malloc",
+          "shape": "bl import:malloc"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "6a4303735e26d7fdd3b45b2ea1fc780721dd23e5a60891247e749c3678092853"
+    },
+    "helper_28": {
+      "instructions": 14,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "c429b280c813972f2aff1dd1c54fbc089d7be0c93e4ea7243f2ab5c1792a3a16"
+    },
+    "helper_21": {
+      "instructions": 15,
+      "edges": {
+        "3": {
+          "mnemonic": "bl",
+          "function": "helper_23",
+          "shape": "bl function:helper_23"
+        },
+        "7": {
+          "mnemonic": "bl",
+          "function": "helper_24",
+          "shape": "bl function:helper_24"
+        },
+        "14": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "d9ce084bb417171fee5f85447839c330bb5846c171fa423c727ed72334f767bd"
+    },
+    "helper_17": {
+      "instructions": 3,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "be75d36b042e98db6f7958ccaac71650ae1afd3cfc06fe9929eca079154abf9f"
+    },
+    "helper_20": {
+      "instructions": 15,
+      "edges": {
+        "3": {
+          "mnemonic": "bl",
+          "function": "helper_23",
+          "shape": "bl function:helper_23"
+        },
+        "7": {
+          "mnemonic": "bl",
+          "function": "helper_24",
+          "shape": "bl function:helper_24"
+        },
+        "14": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "1ef4b8ac3a8559e5ece92ad8bf57dcfe11677ff9b498fed8773f9fb6bfffaf56"
+    },
+    "helper_14": {
+      "instructions": 112,
+      "edges": {
+        "36": {
+          "mnemonic": "bl",
+          "function": "helper_29",
+          "shape": "bl function:helper_29"
+        },
+        "45": {
+          "mnemonic": "bl",
+          "import": "malloc",
+          "shape": "bl import:malloc"
+        },
+        "59": {
+          "mnemonic": "bl",
+          "function": "helper_29",
+          "shape": "bl function:helper_29"
+        },
+        "87": {
+          "mnemonic": "bl",
+          "function": "helper_27",
+          "shape": "bl function:helper_27"
+        },
+        "89": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "93": {
+          "mnemonic": "bl",
+          "function": "helper_27",
+          "shape": "bl function:helper_27"
+        },
+        "95": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "111": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "bff9138b41426dee24e11f35c56b04f28ef99feb5135301ed81dfee38476f55e"
+    },
+    "helper_29": {
+      "instructions": 62,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "7cfce1236a8dc3d52cc4175f5ff6bc0d8e9b9f2cb94251822ccef3c716fe9d0a"
+    },
+    "helper_16": {
+      "instructions": 15,
+      "edges": {
+        "3": {
+          "mnemonic": "bl",
+          "function": "helper_23",
+          "shape": "bl function:helper_23"
+        },
+        "7": {
+          "mnemonic": "bl",
+          "function": "helper_24",
+          "shape": "bl function:helper_24"
+        },
+        "14": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "ccf4788c0b2877251301427765ca5f9c440b95e4dc21a9cdf23ae3586d022e02"
+    },
+    "helper_11": {
+      "instructions": 13,
+      "edges": {
+        "2": {
+          "mnemonic": "bl",
+          "function": "helper_30",
+          "shape": "bl function:helper_30"
+        },
+        "5": {
+          "mnemonic": "bl",
+          "function": "helper_27",
+          "shape": "bl function:helper_27"
+        },
+        "7": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "19506cf75b984db64a87fe29b658c861221ac2200057e5293578eab006d5c578"
+    },
+    "helper_30": {
+      "instructions": 5,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "e71b3c6120641ac26646fb1000ab3b949ada075b757d92f5596867c25782c895"
+    },
+    "helper_19": {
+      "instructions": 25,
+      "edges": {
+        "12": {
+          "mnemonic": "bl",
+          "function": "helper_26",
+          "shape": "bl function:helper_26"
+        },
+        "18": {
+          "mnemonic": "bl",
+          "function": "helper_26",
+          "shape": "bl function:helper_26"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "55af491d73574dc4f78f702c427a031c9c1c71a8a8b0186fd97793afb5835d30"
+    },
+    "helper_13": {
+      "instructions": 6,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "ab4a7fcb0392b417c1749e1adc6a27dfe4f4bbc416ce899cf0c7bc38eb280b60"
+    },
+    "helper_10": {
+      "instructions": 78,
+      "edges": {
+        "31": {
+          "mnemonic": "bl",
+          "function": "helper_31",
+          "shape": "bl function:helper_31"
+        },
+        "56": {
+          "mnemonic": "bl",
+          "function": "helper_31",
+          "shape": "bl function:helper_31"
+        },
+        "77": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "137743a8c57633c62a2fd7af20dc78227642a6d0d60de70729c113567d9f1bf0"
+    },
+    "helper_31": {
+      "instructions": 54,
+      "edges": {
+        "39": {
+          "mnemonic": "bl",
+          "function": "helper_8",
+          "shape": "bl function:helper_8"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "377756f6c3c8ae46e49dc60ec5fcb9bc9a700eb13a2eeeeb3e24a0c7fdae6459"
+    },
+    "helper_8": {
+      "instructions": 38,
+      "edges": {
+        "19": {
+          "mnemonic": "bl",
+          "function": "helper_32",
+          "shape": "bl function:helper_32"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "208aa48a3af7f62512bbf34d7c139ee36edae8fcb393c1413b96eb8586b17ce6"
+    },
+    "helper_32": {
+      "instructions": 14,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "fbf89c0a56860559a4820b48f47fa71dbdabad4ffe012f4950b310f503cffe06"
+    },
+    "helper_9": {
+      "instructions": 23,
+      "edges": {
+        "12": {
+          "mnemonic": "bl",
+          "function": "helper_32",
+          "shape": "bl function:helper_32"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "f8304aada814e016c0943f1c80127216d9fd8f96d69ab5e288a323305a0943bc"
+    },
+    "helper_7": {
+      "instructions": 7,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "68437f7aea028707b3c25ffb6d0cb39f1bff78e607c6dcbc1f70ae7b1a74d41f"
+    },
+    "validator": {
+      "instructions": 169,
+      "edges": {
+        "93": {
+          "mnemonic": "bl",
+          "function": "helper_33",
+          "shape": "bl function:helper_33"
+        },
+        "97": {
+          "mnemonic": "bl",
+          "function": "helper_34",
+          "shape": "bl function:helper_34"
+        },
+        "99": {
+          "mnemonic": "bl",
+          "function": "helper_33",
+          "shape": "bl function:helper_33"
+        },
+        "103": {
+          "mnemonic": "bl",
+          "function": "helper_34",
+          "shape": "bl function:helper_34"
+        },
+        "105": {
+          "mnemonic": "bl",
+          "function": "helper_33",
+          "shape": "bl function:helper_33"
+        },
+        "109": {
+          "mnemonic": "bl",
+          "function": "helper_34",
+          "shape": "bl function:helper_34"
+        },
+        "111": {
+          "mnemonic": "bl",
+          "function": "helper_33",
+          "shape": "bl function:helper_33"
+        },
+        "115": {
+          "mnemonic": "bl",
+          "function": "helper_34",
+          "shape": "bl function:helper_34"
+        },
+        "117": {
+          "mnemonic": "bl",
+          "function": "helper_33",
+          "shape": "bl function:helper_33"
+        },
+        "121": {
+          "mnemonic": "bl",
+          "function": "helper_34",
+          "shape": "bl function:helper_34"
+        },
+        "123": {
+          "mnemonic": "bl",
+          "function": "helper_33",
+          "shape": "bl function:helper_33"
+        },
+        "127": {
+          "mnemonic": "bl",
+          "function": "helper_34",
+          "shape": "bl function:helper_34"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "a03adfa50df50629c3a6895c04268b0470759310c756a8b04957240f8b0d6bea"
+    },
+    "helper_34": {
+      "instructions": 16,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "7378d609ddb3de8b40b6d901ada5edc45f33d43bbd34d05a31a13cc7dceacf20"
+    },
+    "helper_33": {
+      "instructions": 3,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "cd35fa1fa014699ac582e62d8c6f2cab11a2e50c67d49aa0a7f7ddabf757f066"
+    },
+    "helper_6": {
+      "instructions": 44,
+      "edges": {
+        "8": {
+          "mnemonic": "bl",
+          "function": "helper_19",
+          "shape": "bl function:helper_19"
+        },
+        "23": {
+          "mnemonic": "bl",
+          "function": "parser",
+          "shape": "bl function:parser"
+        },
+        "27": {
+          "mnemonic": "bl",
+          "function": "helper_19",
+          "shape": "bl function:helper_19"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "4115dd89ae13cf81a8bed2bc62073acfa19355c92922c76ad60a7cff7643b828"
+    },
+    "parser": {
+      "instructions": 238,
+      "edges": {
+        "16": {
+          "mnemonic": "bl",
+          "function": "helper_28",
+          "shape": "bl function:helper_28"
+        },
+        "18": {
+          "mnemonic": "bl",
+          "function": "helper_35",
+          "shape": "bl function:helper_35"
+        },
+        "27": {
+          "mnemonic": "bl",
+          "function": "helper_35",
+          "shape": "bl function:helper_35"
+        },
+        "37": {
+          "mnemonic": "bl",
+          "function": "helper_36",
+          "shape": "bl function:helper_36"
+        },
+        "41": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        },
+        "46": {
+          "mnemonic": "bl",
+          "function": "selectors",
+          "shape": "bl function:selectors"
+        },
+        "63": {
+          "mnemonic": "adr",
+          "shape": "adr x8, <address>",
+          "function": "helper_37"
+        },
+        "68": {
+          "mnemonic": "bl",
+          "function": "helper_38",
+          "shape": "bl function:helper_38"
+        },
+        "70": {
+          "mnemonic": "adr",
+          "shape": "adr x9, <address>",
+          "function": "helper_39"
+        },
+        "77": {
+          "mnemonic": "bl",
+          "function": "helper_40",
+          "shape": "bl function:helper_40"
+        },
+        "83": {
+          "mnemonic": "bl",
+          "function": "helper_41",
+          "shape": "bl function:helper_41"
+        },
+        "87": {
+          "mnemonic": "bl",
+          "function": "helper_42",
+          "shape": "bl function:helper_42"
+        },
+        "91": {
+          "mnemonic": "bl",
+          "function": "helper_43",
+          "shape": "bl function:helper_43"
+        },
+        "98": {
+          "mnemonic": "bl",
+          "function": "helper_44",
+          "shape": "bl function:helper_44"
+        },
+        "102": {
+          "mnemonic": "bl",
+          "function": "helper_43",
+          "shape": "bl function:helper_43"
+        },
+        "119": {
+          "mnemonic": "bl",
+          "function": "helper_44",
+          "shape": "bl function:helper_44"
+        },
+        "124": {
+          "mnemonic": "bl",
+          "function": "helper_45",
+          "shape": "bl function:helper_45"
+        },
+        "127": {
+          "mnemonic": "bl",
+          "function": "helper_35",
+          "shape": "bl function:helper_35"
+        },
+        "135": {
+          "mnemonic": "bl",
+          "function": "helper_35",
+          "shape": "bl function:helper_35"
+        },
+        "144": {
+          "mnemonic": "bl",
+          "function": "helper_46",
+          "shape": "bl function:helper_46"
+        },
+        "147": {
+          "mnemonic": "bl",
+          "function": "helper_27",
+          "shape": "bl function:helper_27"
+        },
+        "148": {
+          "mnemonic": "bl",
+          "function": "helper_35",
+          "shape": "bl function:helper_35"
+        },
+        "172": {
+          "mnemonic": "bl",
+          "function": "helper_35",
+          "shape": "bl function:helper_35"
+        },
+        "182": {
+          "mnemonic": "bl",
+          "function": "helper_44",
+          "shape": "bl function:helper_44"
+        },
+        "187": {
+          "mnemonic": "bl",
+          "function": "helper_47",
+          "shape": "bl function:helper_47"
+        },
+        "195": {
+          "mnemonic": "bl",
+          "function": "helper_25",
+          "shape": "bl function:helper_25"
+        },
+        "205": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "211": {
+          "mnemonic": "bl",
+          "function": "helper_49",
+          "shape": "bl function:helper_49"
+        },
+        "214": {
+          "mnemonic": "bl",
+          "function": "helper_35",
+          "shape": "bl function:helper_35"
+        },
+        "224": {
+          "mnemonic": "bl",
+          "function": "helper_35",
+          "shape": "bl function:helper_35"
+        },
+        "232": {
+          "mnemonic": "bl",
+          "function": "helper_35",
+          "shape": "bl function:helper_35"
+        },
+        "237": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "3ecb57cf901bcd5bf3e26bcc6a0aec7f7b874d1a42fbc61051ef71163d0bba8b"
+    },
+    "helper_35": {
+      "instructions": 3,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "580e7a71bfe695bea97873a0bb0d02b26d6c21761d181d3a37c2dfa5683d6954"
+    },
+    "helper_49": {
+      "instructions": 133,
+      "edges": {
+        "16": {
+          "mnemonic": "bl",
+          "function": "helper_50",
+          "shape": "bl function:helper_50"
+        },
+        "21": {
+          "mnemonic": "bl",
+          "function": "helper_50",
+          "shape": "bl function:helper_50"
+        },
+        "26": {
+          "mnemonic": "bl",
+          "function": "helper_51",
+          "shape": "bl function:helper_51"
+        },
+        "44": {
+          "mnemonic": "bl",
+          "function": "helper_50",
+          "shape": "bl function:helper_50"
+        },
+        "69": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        },
+        "99": {
+          "mnemonic": "bl",
+          "function": "helper_52",
+          "shape": "bl function:helper_52"
+        },
+        "105": {
+          "mnemonic": "bl",
+          "function": "helper_27",
+          "shape": "bl function:helper_27"
+        },
+        "114": {
+          "mnemonic": "bl",
+          "function": "helper_27",
+          "shape": "bl function:helper_27"
+        },
+        "132": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "16b698771326a63793526fdd80753357a23edba1c22641f58804641336bef93d"
+    },
+    "helper_52": {
+      "instructions": 18,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "52a08a33592373127cc9b859b8e3e1600f5eca5dfee201e83d8af5e958d5fec0"
+    },
+    "helper_50": {
+      "instructions": 39,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "53e10f9427b7d28f24c369913e98c2ebc58be03ed51ef20fe57f40e80c7ce032"
+    },
+    "helper_51": {
+      "instructions": 16,
+      "edges": {
+        "3": {
+          "mnemonic": "bl",
+          "function": "helper_23",
+          "shape": "bl function:helper_23"
+        },
+        "8": {
+          "mnemonic": "bl",
+          "function": "helper_53",
+          "shape": "bl function:helper_53"
+        },
+        "15": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "7864ce5f976c6f80ad11a2e02185745b409ed5342d2595419e75e6aecd7a5bb6"
+    },
+    "helper_53": {
+      "instructions": 3,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "30739a1b712ce80fe8a64bcd7b88f331c98a7f442613f7e92a15e318116c058a"
+    },
+    "helper_48": {
+      "instructions": 36,
+      "edges": {
+        "22": {
+          "mnemonic": "bl",
+          "function": "helper_20",
+          "shape": "bl function:helper_20"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "2bea4a87189ba7287bd7fa97c9e31322b723733ee9e19720c41a25e93037da86"
+    },
+    "helper_47": {
+      "instructions": 37,
+      "edges": {
+        "9": {
+          "mnemonic": "bl",
+          "function": "helper_54",
+          "shape": "bl function:helper_54"
+        },
+        "14": {
+          "mnemonic": "bl",
+          "function": "helper_55",
+          "shape": "bl function:helper_55"
+        },
+        "22": {
+          "mnemonic": "bl",
+          "function": "helper_56",
+          "shape": "bl function:helper_56"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "590a4980b5864992fbfc5dcb31a3ffb481eea6b82e20f374ee98950d97ee441e"
+    },
+    "helper_56": {
+      "instructions": 3,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "884f7ef5c8663c8a3fd14878b63427ea17cc1d0901d3949478ad4ea48bb6cdf7"
+    },
+    "helper_55": {
+      "instructions": 15,
+      "edges": {
+        "3": {
+          "mnemonic": "bl",
+          "function": "helper_23",
+          "shape": "bl function:helper_23"
+        },
+        "7": {
+          "mnemonic": "bl",
+          "function": "helper_24",
+          "shape": "bl function:helper_24"
+        },
+        "14": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "74eae923b256d75e7c0cf5de599a65260a337d26ca44626084306af45116400e"
+    },
+    "helper_54": {
+      "instructions": 2,
+      "edges": {
+        "1": {
+          "mnemonic": "b",
+          "function": "helper_50",
+          "shape": "b function:helper_50"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "abf4599ba912fb8ca400d3b9885d70750b589953208aa4e26e60f5efb640f6e1"
+    },
+    "helper_44": {
+      "instructions": 84,
+      "edges": {
+        "14": {
+          "mnemonic": "bl",
+          "function": "helper_43",
+          "shape": "bl function:helper_43"
+        },
+        "42": {
+          "mnemonic": "bl",
+          "function": "helper_27",
+          "shape": "bl function:helper_27"
+        },
+        "54": {
+          "mnemonic": "bl",
+          "function": "helper_20",
+          "shape": "bl function:helper_20"
+        },
+        "74": {
+          "mnemonic": "bl",
+          "function": "helper_53",
+          "shape": "bl function:helper_53"
+        },
+        "83": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "54a07f27068763dc780de4b46946fcc0a7606ef7f8a7656f4077b841bca8eb89"
+    },
+    "helper_43": {
+      "instructions": 2,
+      "edges": {
+        "1": {
+          "mnemonic": "b",
+          "function": "helper_50",
+          "shape": "b function:helper_50"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "9ceb474d276cccea1e17b89b40904e22244e46369010e199746bf523e415161f"
+    },
+    "helper_46": {
+      "instructions": 44,
+      "edges": {
+        "35": {
+          "mnemonic": "bl",
+          "function": "helper_53",
+          "shape": "bl function:helper_53"
+        },
+        "43": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "4ce22a2d6614a51941be113eacd682e6b17632dd316e7f4cb8f8de7abd9ee290"
+    },
+    "helper_45": {
+      "instructions": 76,
+      "edges": {
+        "15": {
+          "mnemonic": "bl",
+          "function": "helper_50",
+          "shape": "bl function:helper_50"
+        },
+        "21": {
+          "mnemonic": "bl",
+          "function": "helper_36",
+          "shape": "bl function:helper_36"
+        },
+        "26": {
+          "mnemonic": "adr",
+          "shape": "adr x22, <address>",
+          "function": "helper_37"
+        },
+        "33": {
+          "mnemonic": "bl",
+          "function": "helper_57",
+          "shape": "bl function:helper_57"
+        },
+        "38": {
+          "mnemonic": "bl",
+          "function": "helper_25",
+          "shape": "bl function:helper_25"
+        },
+        "49": {
+          "mnemonic": "bl",
+          "function": "helper_57",
+          "shape": "bl function:helper_57"
+        },
+        "61": {
+          "mnemonic": "bl",
+          "function": "helper_53",
+          "shape": "bl function:helper_53"
+        },
+        "73": {
+          "mnemonic": "bl",
+          "function": "helper_26",
+          "shape": "bl function:helper_26"
+        },
+        "75": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "0c74745bddbe1763b7510b32b5be2fe83123a338ce60040cce1d726167a64020"
+    },
+    "helper_57": {
+      "instructions": 125,
+      "edges": {
+        "27": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        },
+        "42": {
+          "mnemonic": "bl",
+          "function": "helper_58",
+          "shape": "bl function:helper_58"
+        },
+        "51": {
+          "mnemonic": "bl",
+          "function": "helper_58",
+          "shape": "bl function:helper_58"
+        },
+        "109": {
+          "mnemonic": "bl",
+          "function": "helper_59",
+          "shape": "bl function:helper_59"
+        },
+        "124": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "eb81e90a32ca7ace0e2ba2bb12a102f5443c9cb826b78afe1814096d6b856e3b"
+    },
+    "helper_59": {
+      "instructions": 3,
+      "edges": {
+        "2": {
+          "mnemonic": "b",
+          "function": "helper_27",
+          "shape": "b function:helper_27"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "db2b518ded4cc8d34361d52b1753049215e9af7f6d9502d1d5459c657d583cad"
+    },
+    "helper_58": {
+      "instructions": 56,
+      "edges": {
+        "6": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "9fa732dd028ff3e72d8d6a59f2740759702b87737eb5454bc734861dd22646d1"
+    },
+    "helper_60": {
+      "instructions": 48,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "0335831467ee8f0065a0dd23f5af7780a4c560677aba79c149ae19371918ce69"
+    },
+    "helper_37": {
+      "instructions": 44,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "94f4a53d283eaa63810ce7f80c8f13c27aa4baed0b12f7936582ba0a1e945bd5"
+    },
+    "helper_36": {
+      "instructions": 37,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "e50c8bb222c557ab6cdbf4eac58ade92740318101290d403dc9d6e5dc8943604"
+    },
+    "helper_42": {
+      "instructions": 36,
+      "edges": {
+        "23": {
+          "mnemonic": "bl",
+          "function": "helper_21",
+          "shape": "bl function:helper_21"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "3480d9bf827fb06921825b9664b0cba3b8b02429b6818c9345946c880d291cfa"
+    },
+    "helper_41": {
+      "instructions": 289,
+      "edges": {
+        "23": {
+          "mnemonic": "bl",
+          "function": "helper_53",
+          "shape": "bl function:helper_53"
+        },
+        "32": {
+          "mnemonic": "bl",
+          "function": "helper_61",
+          "shape": "bl function:helper_61"
+        },
+        "34": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "37": {
+          "mnemonic": "adr",
+          "shape": "adr x24, <address>",
+          "literal": "00"
+        },
+        "45": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "51": {
+          "mnemonic": "bl",
+          "function": "helper_56",
+          "shape": "bl function:helper_56"
+        },
+        "55": {
+          "mnemonic": "bl",
+          "function": "helper_61",
+          "shape": "bl function:helper_61"
+        },
+        "57": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "58": {
+          "mnemonic": "bl",
+          "function": "helper_62",
+          "shape": "bl function:helper_62"
+        },
+        "63": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "69": {
+          "mnemonic": "bl",
+          "function": "helper_56",
+          "shape": "bl function:helper_56"
+        },
+        "73": {
+          "mnemonic": "bl",
+          "function": "helper_61",
+          "shape": "bl function:helper_61"
+        },
+        "75": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "76": {
+          "mnemonic": "bl",
+          "function": "helper_62",
+          "shape": "bl function:helper_62"
+        },
+        "81": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "87": {
+          "mnemonic": "bl",
+          "function": "helper_56",
+          "shape": "bl function:helper_56"
+        },
+        "91": {
+          "mnemonic": "bl",
+          "function": "helper_61",
+          "shape": "bl function:helper_61"
+        },
+        "93": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "94": {
+          "mnemonic": "bl",
+          "function": "helper_62",
+          "shape": "bl function:helper_62"
+        },
+        "99": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "105": {
+          "mnemonic": "bl",
+          "function": "helper_56",
+          "shape": "bl function:helper_56"
+        },
+        "109": {
+          "mnemonic": "bl",
+          "function": "helper_61",
+          "shape": "bl function:helper_61"
+        },
+        "111": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "112": {
+          "mnemonic": "bl",
+          "function": "helper_62",
+          "shape": "bl function:helper_62"
+        },
+        "117": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "123": {
+          "mnemonic": "bl",
+          "function": "helper_56",
+          "shape": "bl function:helper_56"
+        },
+        "127": {
+          "mnemonic": "bl",
+          "function": "helper_61",
+          "shape": "bl function:helper_61"
+        },
+        "129": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "130": {
+          "mnemonic": "bl",
+          "function": "helper_62",
+          "shape": "bl function:helper_62"
+        },
+        "135": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "141": {
+          "mnemonic": "bl",
+          "function": "helper_56",
+          "shape": "bl function:helper_56"
+        },
+        "149": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "155": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "156": {
+          "mnemonic": "bl",
+          "function": "helper_63",
+          "shape": "bl function:helper_63"
+        },
+        "161": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "163": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "169": {
+          "mnemonic": "bl",
+          "function": "helper_56",
+          "shape": "bl function:helper_56"
+        },
+        "177": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "183": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "184": {
+          "mnemonic": "bl",
+          "function": "helper_63",
+          "shape": "bl function:helper_63"
+        },
+        "189": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "191": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "197": {
+          "mnemonic": "bl",
+          "function": "helper_56",
+          "shape": "bl function:helper_56"
+        },
+        "205": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "211": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "212": {
+          "mnemonic": "bl",
+          "function": "helper_63",
+          "shape": "bl function:helper_63"
+        },
+        "217": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "219": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "225": {
+          "mnemonic": "bl",
+          "function": "helper_56",
+          "shape": "bl function:helper_56"
+        },
+        "233": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "239": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "240": {
+          "mnemonic": "bl",
+          "function": "helper_63",
+          "shape": "bl function:helper_63"
+        },
+        "245": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "247": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "253": {
+          "mnemonic": "bl",
+          "function": "helper_56",
+          "shape": "bl function:helper_56"
+        },
+        "261": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "267": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "268": {
+          "mnemonic": "bl",
+          "function": "helper_63",
+          "shape": "bl function:helper_63"
+        },
+        "273": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "275": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "281": {
+          "mnemonic": "bl",
+          "function": "helper_56",
+          "shape": "bl function:helper_56"
+        },
+        "288": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [
+        33,
+        56,
+        74,
+        92,
+        110,
+        128,
+        148,
+        151,
+        176,
+        179,
+        204,
+        207,
+        232,
+        235,
+        260,
+        263
+      ],
+      "string_calls": {
+        "34": {
+          "argument_instruction": 33,
+          "kind": "literal",
+          "text": "org/json/JSONObject"
+        },
+        "57": {
+          "argument_instruction": 56,
+          "kind": "literal",
+          "text": "org/json/JSONArray"
+        },
+        "75": {
+          "argument_instruction": 74,
+          "kind": "literal",
+          "text": "java/lang/String"
+        },
+        "93": {
+          "argument_instruction": 92,
+          "kind": "literal",
+          "text": "java/lang/Integer"
+        },
+        "111": {
+          "argument_instruction": 110,
+          "kind": "literal",
+          "text": "java/lang/Long"
+        },
+        "129": {
+          "argument_instruction": 128,
+          "kind": "literal",
+          "text": "java/lang/Number"
+        },
+        "149": {
+          "argument_instruction": 148,
+          "kind": "literal",
+          "text": "<init>"
+        },
+        "155": {
+          "argument_instruction": 151,
+          "kind": "literal",
+          "text": "(Ljava/lang/String;)V"
+        },
+        "177": {
+          "argument_instruction": 176,
+          "kind": "literal",
+          "text": "opt"
+        },
+        "183": {
+          "argument_instruction": 179,
+          "kind": "literal",
+          "text": "(Ljava/lang/String;)Ljava/lang/Object;"
+        },
+        "205": {
+          "argument_instruction": 204,
+          "kind": "literal",
+          "text": "length"
+        },
+        "211": {
+          "argument_instruction": 207,
+          "kind": "literal",
+          "text": "()I"
+        },
+        "233": {
+          "argument_instruction": 232,
+          "kind": "literal",
+          "text": "get"
+        },
+        "239": {
+          "argument_instruction": 235,
+          "kind": "literal",
+          "text": "(I)Ljava/lang/Object;"
+        },
+        "261": {
+          "argument_instruction": 260,
+          "kind": "literal",
+          "text": "longValue"
+        },
+        "267": {
+          "argument_instruction": 263,
+          "kind": "literal",
+          "text": "()J"
+        }
+      },
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "e67b1c0685be1afbd46ac948f3e1241c2cd9df186ae65ae723ce56083593007e"
+    },
+    "helper_63": {
+      "instructions": 8,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "f9f2e28f3ee1d537c25e0d04ebead30c61d7453a700158df827af3eef49c4c2e"
+    },
+    "helper_62": {
+      "instructions": 6,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "588cb0969721a06fa222a44b2854db68dcd35a998f5f9f9f56f47ec1d62cc21c"
+    },
+    "helper_61": {
+      "instructions": 3,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "1735f8f1ce5070f1adf88e94955f2921fb2bbe43677d07190adfa8d1b2bad888"
+    },
+    "helper_40": {
+      "instructions": 122,
+      "edges": {
+        "50": {
+          "mnemonic": "bl",
+          "function": "helper_64",
+          "shape": "bl function:helper_64"
+        },
+        "53": {
+          "mnemonic": "bl",
+          "function": "helper_65",
+          "shape": "bl function:helper_65"
+        },
+        "72": {
+          "mnemonic": "bl",
+          "function": "helper_64",
+          "shape": "bl function:helper_64"
+        },
+        "75": {
+          "mnemonic": "bl",
+          "function": "helper_65",
+          "shape": "bl function:helper_65"
+        },
+        "115": {
+          "mnemonic": "bl",
+          "function": "helper_66",
+          "shape": "bl function:helper_66"
+        },
+        "119": {
+          "mnemonic": "bl",
+          "function": "helper_66",
+          "shape": "bl function:helper_66"
+        },
+        "121": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "0c54fdaaaf7e2bb75f8af70d7686a490e2aba2ca282b3320812e32546015cb24"
+    },
+    "helper_66": {
+      "instructions": 13,
+      "edges": {
+        "7": {
+          "mnemonic": "bl",
+          "function": "helper_27",
+          "shape": "bl function:helper_27"
+        },
+        "12": {
+          "mnemonic": "b",
+          "function": "helper_59",
+          "shape": "b function:helper_59"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "0d34ddb50f190ca7afe05229ac290cce447c8861cc56028fbfa945fefc8d06ec"
+    },
+    "helper_65": {
+      "instructions": 259,
+      "edges": {
+        "14": {
+          "mnemonic": "bl",
+          "function": "helper_67",
+          "shape": "bl function:helper_67"
+        },
+        "19": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        },
+        "30": {
+          "mnemonic": "bl",
+          "function": "helper_68",
+          "shape": "bl function:helper_68"
+        },
+        "32": {
+          "mnemonic": "adr",
+          "shape": "adr x26, <address>",
+          "literal": "00"
+        },
+        "37": {
+          "mnemonic": "bl",
+          "function": "helper_67",
+          "shape": "bl function:helper_67"
+        },
+        "42": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        },
+        "50": {
+          "mnemonic": "adr",
+          "shape": "adr x9, <address>",
+          "local_instruction": 54
+        },
+        "68": {
+          "mnemonic": "bl",
+          "function": "helper_69",
+          "shape": "bl function:helper_69"
+        },
+        "106": {
+          "mnemonic": "bl",
+          "function": "helper_70",
+          "shape": "bl function:helper_70"
+        },
+        "128": {
+          "mnemonic": "bl",
+          "import": "memcmp",
+          "shape": "bl import:memcmp"
+        },
+        "139": {
+          "mnemonic": "bl",
+          "function": "helper_71",
+          "shape": "bl function:helper_71"
+        },
+        "161": {
+          "mnemonic": "bl",
+          "function": "helper_68",
+          "shape": "bl function:helper_68"
+        },
+        "166": {
+          "mnemonic": "bl",
+          "function": "helper_69",
+          "shape": "bl function:helper_69"
+        },
+        "172": {
+          "mnemonic": "bl",
+          "function": "helper_69",
+          "shape": "bl function:helper_69"
+        },
+        "183": {
+          "mnemonic": "bl",
+          "import": "memcmp",
+          "shape": "bl import:memcmp"
+        },
+        "202": {
+          "mnemonic": "bl",
+          "function": "helper_27",
+          "shape": "bl function:helper_27"
+        },
+        "235": {
+          "mnemonic": "bl",
+          "function": "helper_27",
+          "shape": "bl function:helper_27"
+        },
+        "255": {
+          "mnemonic": "bl",
+          "import": "memcpy",
+          "shape": "bl import:memcpy"
+        },
+        "258": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {
+        "53": [
+          54,
+          84,
+          66,
+          72,
+          58,
+          134,
+          142,
+          78
+        ]
+      },
+      "shape_sha256": "43c322ba1ba37eae5d79f9437d9c1180a7b039a11570a61f1bd5dd8c97611dd6"
+    },
+    "helper_69": {
+      "instructions": 27,
+      "edges": {
+        "11": {
+          "mnemonic": "bl",
+          "function": "helper_58",
+          "shape": "bl function:helper_58"
+        },
+        "26": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "ee2fb9be1439675f3cc1b7c171942286b6b900e775b076497c45af8e43e9f009"
+    },
+    "helper_68": {
+      "instructions": 339,
+      "edges": {
+        "23": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        },
+        "84": {
+          "mnemonic": "adrp",
+          "shape": "adrp x1, <address>"
+        },
+        "87": {
+          "mnemonic": "adr",
+          "shape": "adr x1, <address>",
+          "literal": "7472756500"
+        },
+        "89": {
+          "mnemonic": "adrp",
+          "shape": "adrp x1, <address>"
+        },
+        "92": {
+          "mnemonic": "bl",
+          "function": "helper_72",
+          "shape": "bl function:helper_72"
+        },
+        "100": {
+          "mnemonic": "bl",
+          "function": "helper_70",
+          "shape": "bl function:helper_70"
+        },
+        "115": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        },
+        "122": {
+          "mnemonic": "bl",
+          "function": "helper_73",
+          "shape": "bl function:helper_73"
+        },
+        "126": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        },
+        "135": {
+          "mnemonic": "bl",
+          "function": "helper_73",
+          "shape": "bl function:helper_73"
+        },
+        "139": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        },
+        "158": {
+          "mnemonic": "bl",
+          "function": "helper_58",
+          "shape": "bl function:helper_58"
+        },
+        "205": {
+          "mnemonic": "bl",
+          "function": "helper_73",
+          "shape": "bl function:helper_73"
+        },
+        "209": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        },
+        "220": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        },
+        "229": {
+          "mnemonic": "bl",
+          "function": "helper_73",
+          "shape": "bl function:helper_73"
+        },
+        "233": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        },
+        "240": {
+          "mnemonic": "bl",
+          "function": "helper_73",
+          "shape": "bl function:helper_73"
+        },
+        "244": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        },
+        "252": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        },
+        "259": {
+          "mnemonic": "bl",
+          "function": "helper_73",
+          "shape": "bl function:helper_73"
+        },
+        "263": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        },
+        "271": {
+          "mnemonic": "bl",
+          "function": "helper_73",
+          "shape": "bl function:helper_73"
+        },
+        "275": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        },
+        "282": {
+          "mnemonic": "bl",
+          "function": "helper_73",
+          "shape": "bl function:helper_73"
+        },
+        "286": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        },
+        "338": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {
+        "85": {
+          "base_instruction": 84,
+          "literal": "66616c736500"
+        },
+        "90": {
+          "base_instruction": 89,
+          "literal": "6e756c6c0074"
+        }
+      },
+      "switches": {},
+      "shape_sha256": "056b69a3ea9fca7288e575bd1e0353ad0ccd751203c0c8612988a21ba3740c47"
+    },
+    "helper_73": {
+      "instructions": 26,
+      "edges": {
+        "13": {
+          "mnemonic": "bl",
+          "function": "helper_58",
+          "shape": "bl function:helper_58"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "54fac4b26443af327affc9eecb803feccc0c9047db191d6da06f160d49fd6536"
+    },
+    "helper_70": {
+      "instructions": 190,
+      "edges": {
+        "19": {
+          "mnemonic": "bl",
+          "function": "helper_69",
+          "shape": "bl function:helper_69"
+        },
+        "28": {
+          "mnemonic": "bl",
+          "function": "helper_58",
+          "shape": "bl function:helper_58"
+        },
+        "39": {
+          "mnemonic": "bl",
+          "function": "helper_58",
+          "shape": "bl function:helper_58"
+        },
+        "68": {
+          "mnemonic": "bl",
+          "function": "helper_58",
+          "shape": "bl function:helper_58"
+        },
+        "85": {
+          "mnemonic": "bl",
+          "function": "helper_52",
+          "shape": "bl function:helper_52"
+        },
+        "100": {
+          "mnemonic": "adr",
+          "shape": "adr x12, <address>",
+          "literal": "00"
+        },
+        "101": {
+          "mnemonic": "adr",
+          "shape": "adr x10, <address>",
+          "local_instruction": 105
+        },
+        "137": {
+          "mnemonic": "bl",
+          "function": "helper_74",
+          "shape": "bl function:helper_74"
+        },
+        "146": {
+          "mnemonic": "bl",
+          "function": "helper_69",
+          "shape": "bl function:helper_69"
+        },
+        "150": {
+          "mnemonic": "bl",
+          "function": "helper_69",
+          "shape": "bl function:helper_69"
+        },
+        "155": {
+          "mnemonic": "bl",
+          "function": "helper_74",
+          "shape": "bl function:helper_74"
+        },
+        "189": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {
+        "104": [
+          105,
+          165,
+          165,
+          165,
+          133,
+          165,
+          158,
+          135
+        ]
+      },
+      "shape_sha256": "4c0741b62f9607598e46d401b14654b2eba86398e2253e7e0bd6f79374793e87"
+    },
+    "helper_74": {
+      "instructions": 54,
+      "edges": {
+        "19": {
+          "mnemonic": "bl",
+          "function": "helper_58",
+          "shape": "bl function:helper_58"
+        },
+        "53": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "de56761863354440ef3156ec2c35c7b769398e50064360d522ca35ca79a88cb2"
+    },
+    "helper_72": {
+      "instructions": 20,
+      "edges": {
+        "11": {
+          "mnemonic": "bl",
+          "function": "helper_69",
+          "shape": "bl function:helper_69"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "b2cd64485810ed5c3cb9fcc3c4fdab3c59c91df7bdce8594980c7dbec1235719"
+    },
+    "helper_71": {
+      "instructions": 15,
+      "edges": {
+        "5": {
+          "mnemonic": "bl",
+          "function": "helper_69",
+          "shape": "bl function:helper_69"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "2692380d9257e8e9c84aa7d8e5fad6b1ae1f9a19d078d7903a88d9347ce7f5b2"
+    },
+    "helper_67": {
+      "instructions": 44,
+      "edges": {
+        "16": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        },
+        "26": {
+          "mnemonic": "bl",
+          "function": "helper_58",
+          "shape": "bl function:helper_58"
+        },
+        "43": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "bad45ddf5d25c22b07a0f28de44c05dc53e65941ee3d1ca4d6988a80101ddf18"
+    },
+    "helper_64": {
+      "instructions": 39,
+      "edges": {
+        "13": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "281d562448c8d83539c5de59e531189ca90e104b63dfeb33b94f7a8a0e27c19c"
+    },
+    "helper_39": {
+      "instructions": 6,
+      "edges": {
+        "5": {
+          "mnemonic": "b",
+          "function": "helper_75",
+          "shape": "b function:helper_75"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "a2dfdd1ebbf140a200d3b0b4622e2d82566338de5dd82fdfceccc62dfa47e053"
+    },
+    "helper_75": {
+      "instructions": 191,
+      "edges": {
+        "37": {
+          "mnemonic": "bl",
+          "function": "helper_28",
+          "shape": "bl function:helper_28"
+        },
+        "45": {
+          "mnemonic": "bl",
+          "function": "helper_25",
+          "shape": "bl function:helper_25"
+        },
+        "65": {
+          "mnemonic": "bl",
+          "function": "helper_26",
+          "shape": "bl function:helper_26"
+        },
+        "84": {
+          "mnemonic": "adr",
+          "shape": "adr x27, <address>",
+          "literal": "00"
+        },
+        "89": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "99": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "113": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "119": {
+          "mnemonic": "bl",
+          "function": "decoder",
+          "shape": "bl function:decoder"
+        },
+        "131": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "133": {
+          "mnemonic": "bl",
+          "function": "helper_11",
+          "shape": "bl function:helper_11"
+        },
+        "164": {
+          "mnemonic": "bl",
+          "function": "helper_76",
+          "shape": "bl function:helper_76"
+        },
+        "190": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [
+        88,
+        112,
+        115
+      ],
+      "string_calls": {
+        "89": {
+          "argument_instruction": 88,
+          "kind": "literal",
+          "text": "java/lang/Double"
+        },
+        "113": {
+          "argument_instruction": 112,
+          "kind": "literal",
+          "text": "parseDouble"
+        },
+        "119": {
+          "argument_instruction": 115,
+          "kind": "literal",
+          "text": "(Ljava/lang/String;)D"
+        }
+      },
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "5553397f0b404dd1700987f79486bc9c568e9fd33d07def8894a9d7beceb17de"
+    },
+    "helper_76": {
+      "instructions": 16,
+      "edges": {
+        "3": {
+          "mnemonic": "bl",
+          "function": "helper_23",
+          "shape": "bl function:helper_23"
+        },
+        "8": {
+          "mnemonic": "bl",
+          "function": "helper_53",
+          "shape": "bl function:helper_53"
+        },
+        "15": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "daa6f16bc18a41de1f9ed84026adb5677c42251141a2e34ba9cae863f1864eba"
+    },
+    "helper_38": {
+      "instructions": 17,
+      "edges": {
+        "6": {
+          "mnemonic": "bl",
+          "function": "helper_77",
+          "shape": "bl function:helper_77"
+        },
+        "7": {
+          "mnemonic": "adrp",
+          "shape": "adrp x8, <address>"
+        },
+        "8": {
+          "mnemonic": "adrp",
+          "shape": "adrp x9, <address>"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {
+        "9": {
+          "base_instruction": 7,
+          "literal": "00001000000000000004000000000000"
+        },
+        "10": {
+          "base_instruction": 8,
+          "literal": "00000100000000000010000000000000"
+        }
+      },
+      "switches": {},
+      "shape_sha256": "754ae3850298278259546d27e926d98573d4d3858b11daa972320611e82c1aa6"
+    },
+    "helper_77": {
+      "instructions": 11,
+      "edges": {
+        "0": {
+          "mnemonic": "adrp",
+          "shape": "adrp x8, <address>"
+        },
+        "1": {
+          "mnemonic": "adrp",
+          "shape": "adrp x9, <address>"
+        },
+        "4": {
+          "mnemonic": "adrp",
+          "shape": "adrp x8, <address>"
+        },
+        "5": {
+          "mnemonic": "adrp",
+          "shape": "adrp x9, <address>"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {
+        "2": {
+          "base_instruction": 0,
+          "literal": "00000004000000000040000000000000"
+        },
+        "3": {
+          "base_instruction": 1,
+          "literal": "00000002000000000000100000000000"
+        },
+        "6": {
+          "base_instruction": 4,
+          "literal": "00040000000000000000010000000000"
+        },
+        "8": {
+          "base_instruction": 5,
+          "literal": "00100000000000004000000000000000"
+        }
+      },
+      "switches": {},
+      "shape_sha256": "1f2995ee487bc0391a1a1398b0c436280dc82187e6fa43da86189b1477b7cb98"
+    },
+    "selectors": {
+      "instructions": 38,
+      "edges": {
+        "3": {
+          "mnemonic": "adr",
+          "shape": "adr x23, <address>"
+        },
+        "17": {
+          "mnemonic": "bl",
+          "function": "helper_78",
+          "shape": "bl function:helper_78"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "c276c499d9816f19d88a0838c06692e3ac36ae9a78307e1f116142ac2013c273"
+    },
+    "helper_78": {
+      "instructions": 63,
+      "edges": {
+        "51": {
+          "mnemonic": "bl",
+          "function": "helper_27",
+          "shape": "bl function:helper_27"
+        },
+        "62": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "323e70f7be2b0930616e25a859a1e501e51fedd92c22cc6c24f9816829ace3ff"
+    },
+    "helper_5": {
+      "instructions": 122,
+      "edges": {
+        "9": {
+          "mnemonic": "adrp",
+          "shape": "adrp x23, <address>"
+        },
+        "11": {
+          "mnemonic": "bl",
+          "import": "pthread_getspecific",
+          "shape": "bl import:pthread_getspecific"
+        },
+        "23": {
+          "mnemonic": "bl",
+          "import": "realloc",
+          "shape": "bl import:realloc"
+        },
+        "31": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        },
+        "33": {
+          "mnemonic": "adrp",
+          "shape": "adrp x20, <address>"
+        },
+        "35": {
+          "mnemonic": "adr",
+          "shape": "adr x1, <address>",
+          "function": "helper_79"
+        },
+        "37": {
+          "mnemonic": "bl",
+          "import": "pthread_once",
+          "shape": "bl import:pthread_once"
+        },
+        "39": {
+          "mnemonic": "bl",
+          "import": "pthread_mutex_lock",
+          "shape": "bl import:pthread_mutex_lock"
+        },
+        "42": {
+          "mnemonic": "adrp",
+          "shape": "adrp x8, <address>"
+        },
+        "48": {
+          "mnemonic": "adrp",
+          "shape": "adrp x0, <address>"
+        },
+        "50": {
+          "mnemonic": "bl",
+          "import": "pthread_mutex_unlock",
+          "shape": "bl import:pthread_mutex_unlock"
+        },
+        "51": {
+          "mnemonic": "adrp",
+          "shape": "adrp x23, <address>"
+        },
+        "53": {
+          "mnemonic": "bl",
+          "import": "pthread_getspecific",
+          "shape": "bl import:pthread_getspecific"
+        },
+        "60": {
+          "mnemonic": "bl",
+          "import": "malloc",
+          "shape": "bl import:malloc"
+        },
+        "66": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        },
+        "72": {
+          "mnemonic": "bl",
+          "import": "pthread_setspecific",
+          "shape": "bl import:pthread_setspecific"
+        },
+        "93": {
+          "mnemonic": "bl",
+          "import": "malloc",
+          "shape": "bl import:malloc"
+        },
+        "104": {
+          "mnemonic": "bl",
+          "import": "memcpy",
+          "shape": "bl import:memcpy"
+        },
+        "109": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        },
+        "118": {
+          "mnemonic": "bl",
+          "import": "abort",
+          "shape": "bl import:abort"
+        },
+        "119": {
+          "mnemonic": "bl",
+          "import": "abort",
+          "shape": "bl import:abort"
+        },
+        "120": {
+          "mnemonic": "bl",
+          "import": "abort",
+          "shape": "bl import:abort"
+        },
+        "121": {
+          "mnemonic": "bl",
+          "import": "abort",
+          "shape": "bl import:abort"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {
+        "10": {
+          "base_instruction": 9,
+          "global_offset": 17036
+        },
+        "34": {
+          "base_instruction": 33,
+          "global_offset": 17040
+        },
+        "43": {
+          "base_instruction": 42,
+          "global_offset": 17048
+        },
+        "46": {
+          "base_instruction": 42,
+          "global_offset": 17048
+        },
+        "49": {
+          "base_instruction": 48,
+          "global_offset": 17056
+        },
+        "52": {
+          "base_instruction": 51,
+          "global_offset": 17036
+        },
+        "69": {
+          "base_instruction": 51,
+          "global_offset": 17036
+        }
+      },
+      "switches": {},
+      "shape_sha256": "668da12980e7cf7a550aa26644ca8997eb24505ab1217d7ff4025331565a0ac2"
+    },
+    "helper_79": {
+      "instructions": 14,
+      "edges": {
+        "2": {
+          "mnemonic": "adrp",
+          "shape": "adrp x0, <address>"
+        },
+        "4": {
+          "mnemonic": "adr",
+          "shape": "adr x1, <address>",
+          "function": "helper_80"
+        },
+        "5": {
+          "mnemonic": "bl",
+          "import": "pthread_key_create",
+          "shape": "bl import:pthread_key_create"
+        },
+        "7": {
+          "mnemonic": "adrp",
+          "shape": "adrp x8, <address>"
+        },
+        "13": {
+          "mnemonic": "bl",
+          "import": "abort",
+          "shape": "bl import:abort"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {
+        "3": {
+          "base_instruction": 2,
+          "global_offset": 17036
+        },
+        "9": {
+          "base_instruction": 7,
+          "global_offset": 17032
+        }
+      },
+      "switches": {},
+      "shape_sha256": "715a05214e12f83ac8992c836c177f984ee0c6e8a37dae5a02f48febe39f3056"
+    },
+    "helper_80": {
+      "instructions": 34,
+      "edges": {
+        "7": {
+          "mnemonic": "adrp",
+          "shape": "adrp x9, <address>"
+        },
+        "14": {
+          "mnemonic": "b",
+          "import": "pthread_setspecific",
+          "shape": "b import:pthread_setspecific"
+        },
+        "26": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "33": {
+          "mnemonic": "b",
+          "import": "free",
+          "shape": "b import:free"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {
+        "11": {
+          "base_instruction": 7,
+          "global_offset": 17036
+        }
+      },
+      "switches": {},
+      "shape_sha256": "dcd5b615bd3b5fc339ea708ce6c2894281ccce3285e0a29103db8e5ea2322406"
+    }
+  },
+  "literals": [],
+  "tail_calls": true,
+  "byte_switches": true,
+  "role_indices": {
+    "loader_class": 0,
+    "loader_constructor_signature": 2,
+    "activity_loader_method": 3,
+    "activity_loader_signature": 4,
+    "load_class_method": 5,
+    "load_class_signature": 6,
+    "entry_class": 7,
+    "entry_constructor_signature": 8,
+    "entry_method": 9,
+    "entry_signature": 10,
+    "class_class": 11,
+    "class_lookup_method": 12,
+    "class_lookup_signature": 13,
+    "constructor_name": 14
+  },
+  "context_fields_offset": 96,
+  "selector_table_instruction": 3,
+  "review_report": "reports/family4/com.sakjdfcalculatorconvertornew.app/02_native_analysis.md"
+}
