@@ -16,7 +16,7 @@ from family4_indexed import verify_graph, shape
 from family4_decoder import Decoder
 
 MODEL = 'family4_encoded_models.json'
-MODELS = (MODEL, 'family4_encoded_split_models.json')
+MODELS = (MODEL, 'family4_encoded_split_models.json', 'family4_encoded_records_models.json')
 DEFAULT_TRIGGER = {'before':24, 'after':72, 'calls':{'6':'selector_value','12':'formatter'},
                    'failures':[7,18], 'formatter_instruction':12}
 
@@ -55,6 +55,13 @@ def selector_parameters(codes, model):
     for name,site in model['selector_parameters'].items():
         op=codes[site['function']][site['instruction']].operands[site['operand']]
         result[name]=op.shift.value if site.get('shift') else op.imm
+    if model.get('selector_kind')=='rotating_u64_records':
+        chunks={f'rotation_mask_{k}' for k in range(4)}
+        if (set(result)!=chunks|{'mapping_mask'} or not 0<=result['mapping_mask']<=0xff
+                or not all(0<=result[k]<=0xffff for k in chunks)):
+            raise Unsupported('unmodeled record selector parameters')
+        return {'kind':'rotating_u64_records', 'mapping_mask':result['mapping_mask'],
+                'rotation_mask':sum(result[f'rotation_mask_{k}']<<(16*k) for k in range(4))}
     if (set(result)!={'mapping_mask','low_rotation','high_rotation'}
             or not 0<=result['mapping_mask']<=0xffffffff
             or not all(1<=result[k]<=31 for k in ('low_rotation','high_rotation'))):
@@ -64,6 +71,8 @@ def selector_parameters(codes, model):
 
 def selectors(img, refs, spec, parameters=None):
     parameters=selector_parameters({}, {}) if parameters is None else parameters
+    if parameters.get('kind')=='rotating_u64_records':
+        return record_selectors(img,refs,spec,parameters)
     addresses={name:refs[tuple(site)] for name,site in spec.items()}
     sizes={'mapping':64,'xor':128,'add':128,'cipher':128}
     for name,address in addresses.items():
@@ -84,6 +93,37 @@ def selectors(img, refs, spec, parameters=None):
     # Same nonnegative decimal domain as the proof generator and prior readers.
     if len(set(keys[1:]))!=15 or not all(0<=k<10**12 for k in keys):
         raise Unsupported('invalid recovered encrypted selectors')
+    return keys,addresses
+
+
+def record_selectors(img, refs, spec, parameters):
+    """Decode the verified uint16 index map and five-word uint64 records.
+
+    The instruction model fixes the low-byte mask, record stride, arithmetic,
+    MOVK shifts and both rotation guards. Only the cipher scalars and tables
+    are input-derived. These reads never execute the loader.
+    """
+    addresses={name:refs[tuple(site)] for name,site in spec.items()}
+    sizes={'mapping':32, 'records':640}
+    if set(addresses)!=set(sizes):raise Unsupported('incomplete record selector tables')
+    for name,address in addresses.items():
+        if not any(not s['p_flags']&2 and s['p_vaddr']<=address and
+                   address+sizes[name]<=s['p_vaddr']+s['p_filesz'] for s in img.loads):
+            raise Unsupported('record selector table is not read-only')
+    mapping=[(x&0xff)^parameters['mapping_mask']
+             for x in struct.unpack('<16H',img.read(addresses['mapping'],32))]
+    if sorted(mapping)!=list(range(16)):
+        raise Unsupported('record selector mapping is not a permutation')
+    records=list(struct.iter_unpack('<5Q',img.read(addresses['records'],640)))
+    keys=[];mask=(1<<64)-1
+    for index in mapping:
+        a,encoded_rotation,cipher,add,b=records[index]
+        rotation=encoded_rotation^parameters['rotation_mask']
+        if not 1<=rotation<=63:raise Unsupported('invalid record selector rotation')
+        rotated=((cipher>>rotation)|(cipher<<(64-rotation)))&mask
+        keys.append(((rotated-add)&mask)^a^b)
+    if len(set(keys[1:]))!=15 or not all(0<=k<10**12 for k in keys):
+        raise Unsupported('invalid recovered record selectors')
     return keys,addresses
 
 
