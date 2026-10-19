@@ -1,0 +1,180 @@
+"""Reviewed encrypted selectors and indirect field roles for a Family4 core.
+
+Instruction graphs bind every parser/loader helper; selector ciphertext and
+constant-ID string calls are recovered from the input. No package/hash lookup.
+"""
+from bisect import bisect_right
+import hashlib
+import json
+from pathlib import Path
+import re
+import struct
+
+from family4_native import (Unsupported, Code, ARM64_OP_MEM, _local_argument,
+                            _jni_slot, _validator_model)
+from family4_indexed import verify_graph, shape
+from family4_decoder import Decoder
+
+MODEL = 'family4_encoded_models.json'
+
+
+def trigger_shape(img, call, bound):
+    """Check the reviewed successful path from selector(0) to NewStringUTF.
+
+    Failure exits leave this slice; the result is conditional path evidence,
+    not a claim that startup or any of these branches ran.
+    """
+    start, end = call.address-24, call.address+72
+    code = Code(img.byaddr[a] for a in range(start,end+4,4) if a in img.byaddr)
+    if len(code)!=25:raise Unsupported('incomplete encoded outer-trigger slice')
+    replacements={}
+    for k,ins in enumerate(code):
+        if ins.mnemonic=='bl':
+            name={6:'selector_value',12:'formatter'}.get(k)
+            if name is None or ins.operands[0].imm!=bound[name]:
+                raise Unsupported('changed encoded trigger helper')
+            replacements[k]='bl function:'+name
+        elif ins.mnemonic=='tbz':
+            if k not in (7,18) or start<=ins.operands[-1].imm<=end:
+                raise Unsupported('changed encoded trigger failure exit')
+            replacements[k]=ins.mnemonic+' '+ins.op_str.rsplit(', ',1)[0]+', <failure>'
+    return shape(code,replacements),code
+
+
+def selectors(img, refs, spec):
+    addresses={name:refs[tuple(site)] for name,site in spec.items()}
+    sizes={'mapping':64,'xor':128,'add':128,'cipher':128}
+    for name,address in addresses.items():
+        if not any(not s['p_flags']&2 and s['p_vaddr']<=address and
+                   address+sizes[name]<=s['p_vaddr']+s['p_filesz'] for s in img.loads):
+            raise Unsupported('encoded selector table is not read-only')
+    mapping=[x^0xd4 for x in struct.unpack('<16I',img.read(addresses['mapping'],64))]
+    if sorted(mapping)!=list(range(16)):
+        raise Unsupported('encoded selector mapping is not a permutation')
+    tables={name:struct.unpack('<32I',img.read(addresses[name],128)) for name in ('xor','add','cipher')}
+    ror=lambda x,n:((x>>n)|(x<<(32-n)))&0xffffffff
+    keys=[]
+    for index in mapping:
+        low,high=2*index,2*index+1
+        lo=((tables['xor'][low]^ror(tables['cipher'][low],14))-tables['add'][low])&0xffffffff
+        hi=((ror(tables['cipher'][high],26)-tables['add'][high])&0xffffffff)^tables['xor'][high]
+        keys.append(lo|(hi<<32))
+    # Same nonnegative decimal domain as the proof generator and prior readers.
+    if len(set(keys[1:]))!=15 or not all(0<=k<10**12 for k in keys):
+        raise Unsupported('invalid recovered encrypted selectors')
+    return keys,addresses
+
+
+def recover_strings(img, model, bound, codes, constants, imported):
+    entries={name:bound[name] for name in model['isolated_decoders'] if name in bound}
+    # These two additional pools supply network constants. Match their complete
+    # decoder graphs before isolated execution; do not run arbitrary app helpers.
+    for name,aux in model['auxiliary_decoders'].items():
+        matches=[]
+        for start in img.starts:
+            try:verify_graph(img,start,aux,core=True)
+            except (Unsupported,KeyError,IndexError):continue
+            matches.append(start)
+        if len(matches)!=1:raise Unsupported('missing or ambiguous auxiliary decoder: '+name)
+        entries[name]=matches[0]
+    decoders={name:Decoder(img,va,imported) for name,va in entries.items()}
+    def decode(name,identifier):
+        decoder=decoders[name]
+        if identifier not in decoder.cache and sum(d.total_time for d in decoders.values())>=Decoder.MAX_TOTAL_SECONDS:
+            raise Unsupported('encoded decoder aggregate time budget')
+        return decoder.decode(identifier)
+    required=[]
+    for name,spec in model['functions'].items():
+        for k,binding in spec.get('string_calls',{}).items():
+            identifier=(constants[(name,binding['argument_instruction'])] if 'argument_instruction' in binding
+                        else binding['identifier'])
+            row=decode(binding['decoder'],identifier)
+            if row is None or row['text']!=binding['text']:
+                raise Unsupported('encoded core string does not match its JNI use')
+            required.append((binding['decoder'],identifier,codes[name][int(k)].address))
+    calls={};byentry={va:name for name,va in entries.items()}
+    for k,ins in enumerate(img.ins):
+        if ins.mnemonic!='bl' or ins.operands[0].imm not in byentry:continue
+        identifier=_local_argument(img.ins,k,'x0')
+        if identifier is not None and 0<=identifier<=0xffffffff:
+            calls.setdefault((byentry[ins.operands[0].imm],identifier),[]).append(ins.address)
+    if len(calls)>Decoder.MAX_CALLS:raise Unsupported('encoded decoder aggregate call budget')
+    rows=[]
+    for (name,identifier),addresses in calls.items():
+        row=decode(name,identifier)
+        if row is None:raise Unsupported('encoded decoder rejected a referenced ID')
+        row['decode_calls']=[{'call_va':hex(a),'string_id':identifier} for a in addresses]
+        rows.append(row)
+    if not all(va in calls.get((name,identifier),[]) for name,identifier,va in required):
+        raise Unsupported('incomplete encoded decoder call provenance')
+    return rows
+
+
+def analyze_encoded(img):
+    candidates=set()
+    for ins in img.ins:
+        if (ins.mnemonic=='ldr' and len(ins.operands)==2 and ins.operands[1].type==ARM64_OP_MEM
+                and ins.operands[1].mem.disp==0x730):
+            at=bisect_right(img.starts,ins.address)-1
+            if at>=0:candidates.add(img.starts[at])
+    if not candidates:return None
+    if len(candidates)>16:return None
+    model=json.loads(Path(__file__).with_name(MODEL).read_text());results=[];failures=[]
+    for start in sorted(candidates):
+        try:bound,codes,refs,constants,imported=verify_graph(img,start,model,core=True)
+        except (Unsupported,KeyError,IndexError):continue
+        try:
+            keys,addresses=selectors(img,refs,model['selector_arrays'])
+            triggers=[]
+            for ins in img.ins:
+                if ins.mnemonic!='bl' or ins.operands[0].imm!=bound['selector_value']:continue
+                try:observed,code=trigger_shape(img,ins,bound)
+                except (Unsupported,KeyError):continue
+                if hashlib.sha256(observed.encode()).hexdigest()==model['trigger_sha256']:
+                    triggers.append({'value':str(keys[0]),'selector_source':'verified_encrypted_selector_zero',
+                                     'selector_call_va':hex(ins.address),'format_call_va':hex(code[12].address),
+                                     'jni_call_va':hex(code[-1].address),
+                                     'scope':'Conditional successful instruction path; startup reachability is not established.'})
+            if len(triggers)!=1:raise Unsupported('missing or ambiguous encrypted selector trigger')
+            guard,helpers=_validator_model(img,img.function(bound['validator']))
+            if guard is None:raise Unsupported('unmodeled encrypted-core DEX validator')
+            evidence=[]
+            for item in model['jni_roles']:
+                ins=codes['loader'][item['instruction']]
+                if _jni_slot(codes['loader'],item['instruction'])!=item['slot']:
+                    raise Unsupported('changed encoded-core JNI role call')
+                evidence.append({'jni_slot':hex(item['slot']),'name_key':str(keys[item['name_index']]),
+                                 'signature_key':str(keys[item['signature_index']]),'call_va':hex(ins.address),
+                                 'binding':'Reviewed loader graph and checked role-map table.'})
+            rows=recover_strings(img,model,bound,codes,constants,imported)
+            endpoints={r['text'] for r in rows if re.fullmatch(r'https?://[^\s]+',r['text'])}
+            values={r['text'] for r in rows}
+            if len(endpoints)!=1 or not {'java/nio/ByteBuffer','allocateDirect','java/lang/ClassLoader',
+                                        'org/json/JSONObject','getResponseCode','POST','<init>'}<=values:
+                raise Unsupported('incomplete encrypted-core strings/endpoint')
+            contract={'outer_key':str(keys[0]),'array_key':str(keys[2]),
+                'roles':{role:str(keys[index+1]) for role,index in model['role_indices'].items()},
+                'complete':True,'selector_storage':{k:hex(v) for k,v in addresses.items()},
+                'selector_decoder_va':hex(bound['selector_value']),'parser_va':hex(bound['parser']),
+                'loader_va':hex(start),'dex_validator_va':hex(bound['validator']),
+                'validator_model':guard,'validator_helpers':helpers,'role_evidence':evidence,
+                'outer_trigger_evidence':triggers,'diagnostics':[],
+                'guards':{'dex_min_bytes':112,'dex_max_bytes':33554432,
+                          'dex_versions':['035','037','038','039','040','041'],'exact_file_size':True,
+                          'header_and_table_bounds':True,'dex_checksum_checked_by_native':False},
+                'additional_checks':'Verified JSON preflight, indirect field roles, descriptor syntax, allocation budgets and JNI types.'}
+            results.append({'family':'family4','variant':'encrypted_selector_core','contract_model':MODEL,
+                'status':'supported','sha256':hashlib.sha256(img.data).hexdigest(),'endpoint':next(iter(endpoints)),
+                'http_method':'POST','strings':rows,'contracts':[contract],'diagnostics':[],
+                'evidence_level':'verified_native_contract_and_isolated_decoder_calls','runtime_execution_observed':False,
+                'endpoint_evidence':'Decoded constant-ID call; surrounding network path is not verified.',
+                'limitations':['Conditional verified loader and outer-selector path; startup and network reachability are not established.',
+                               'Role-map changes and unknown parser/loader layouts require review.',
+                               'Bounded isolated decoder execution is not app or DEX runtime execution.']})
+        except (Unsupported,ValueError,struct.error) as error:failures.append(str(error))
+    if len(results)==1:return results[0]
+    if results or failures:
+        return {'family':'family4','variant':'encrypted_selector_core','status':'needs_review','contracts':[],
+                'strings':[],'diagnostics':['ambiguous encrypted cores'] if results else failures,
+                'runtime_execution_observed':False}
+    return None

@@ -220,7 +220,7 @@ def verify_graph(img, root, model, *, core=False):
             continue
         if start in bound.values(): raise Unsupported('aliased indexed helpers')
         bound[name] = start
-        if core and name == 'decoder':
+        if core and name in model.get('isolated_decoders', ['decoder']):
             continue  # Recovered independently by bounded isolated calls.
         if name == 'mapper':
             map_id(img,start,0,imported)

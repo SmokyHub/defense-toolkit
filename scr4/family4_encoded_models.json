@@ -1,0 +1,2744 @@
+{
+  "format": "apk-defense.family4-core-model/v1",
+  "functions": {
+    "loader": {
+      "instructions": 1007,
+      "edges": {
+        "24": {
+          "mnemonic": "adr",
+          "shape": "adr x0, <address>"
+        },
+        "25": {
+          "mnemonic": "bl",
+          "function": "helper_14",
+          "shape": "bl function:helper_14"
+        },
+        "36": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        },
+        "40": {
+          "mnemonic": "bl",
+          "function": "helper_15",
+          "shape": "bl function:helper_15"
+        },
+        "46": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        },
+        "48": {
+          "mnemonic": "bl",
+          "function": "validator",
+          "shape": "bl function:validator"
+        },
+        "52": {
+          "mnemonic": "bl",
+          "function": "decoder_names",
+          "shape": "bl function:decoder_names"
+        },
+        "56": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "65": {
+          "mnemonic": "adr",
+          "shape": "adr x27, <address>",
+          "literal": "00"
+        },
+        "74": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "85": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "95": {
+          "mnemonic": "bl",
+          "import": "memcmp",
+          "shape": "bl import:memcmp"
+        },
+        "98": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "106": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "115": {
+          "mnemonic": "bl",
+          "function": "helper_16",
+          "shape": "bl function:helper_16"
+        },
+        "118": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "130": {
+          "mnemonic": "bl",
+          "function": "helper_17",
+          "shape": "bl function:helper_17"
+        },
+        "133": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "145": {
+          "mnemonic": "bl",
+          "function": "helper_17",
+          "shape": "bl function:helper_17"
+        },
+        "148": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "160": {
+          "mnemonic": "bl",
+          "function": "helper_17",
+          "shape": "bl function:helper_17"
+        },
+        "163": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "175": {
+          "mnemonic": "bl",
+          "function": "helper_17",
+          "shape": "bl function:helper_17"
+        },
+        "178": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "186": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "192": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "206": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "209": {
+          "mnemonic": "bl",
+          "function": "helper_18",
+          "shape": "bl function:helper_18"
+        },
+        "243": {
+          "mnemonic": "bl",
+          "function": "helper_19",
+          "shape": "bl function:helper_19"
+        },
+        "246": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "261": {
+          "mnemonic": "bl",
+          "function": "helper_19",
+          "shape": "bl function:helper_19"
+        },
+        "264": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "279": {
+          "mnemonic": "bl",
+          "function": "helper_19",
+          "shape": "bl function:helper_19"
+        },
+        "282": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "288": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        },
+        "298": {
+          "mnemonic": "bl",
+          "function": "helper_19",
+          "shape": "bl function:helper_19"
+        },
+        "301": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "316": {
+          "mnemonic": "bl",
+          "function": "helper_19",
+          "shape": "bl function:helper_19"
+        },
+        "319": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "326": {
+          "mnemonic": "bl",
+          "function": "helper_20",
+          "shape": "bl function:helper_20"
+        },
+        "337": {
+          "mnemonic": "bl",
+          "function": "helper_19",
+          "shape": "bl function:helper_19"
+        },
+        "340": {
+          "mnemonic": "bl",
+          "function": "helper_20",
+          "shape": "bl function:helper_20"
+        },
+        "362": {
+          "mnemonic": "bl",
+          "function": "decoder_classes",
+          "shape": "bl function:decoder_classes"
+        },
+        "372": {
+          "mnemonic": "bl",
+          "function": "helper_20",
+          "shape": "bl function:helper_20"
+        },
+        "383": {
+          "mnemonic": "bl",
+          "function": "decoder_classes",
+          "shape": "bl function:decoder_classes"
+        },
+        "393": {
+          "mnemonic": "bl",
+          "function": "helper_20",
+          "shape": "bl function:helper_20"
+        },
+        "404": {
+          "mnemonic": "bl",
+          "function": "decoder_classes",
+          "shape": "bl function:decoder_classes"
+        },
+        "414": {
+          "mnemonic": "bl",
+          "function": "helper_20",
+          "shape": "bl function:helper_20"
+        },
+        "424": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "447": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "455": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "478": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "486": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "494": {
+          "mnemonic": "bl",
+          "function": "helper_21",
+          "shape": "bl function:helper_21"
+        },
+        "509": {
+          "mnemonic": "bl",
+          "function": "helper_22",
+          "shape": "bl function:helper_22"
+        },
+        "514": {
+          "mnemonic": "bl",
+          "function": "helper_23",
+          "shape": "bl function:helper_23"
+        },
+        "539": {
+          "mnemonic": "bl",
+          "function": "helper_24",
+          "shape": "bl function:helper_24"
+        },
+        "581": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "590": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "614": {
+          "mnemonic": "bl",
+          "function": "helper_25",
+          "shape": "bl function:helper_25"
+        },
+        "639": {
+          "mnemonic": "bl",
+          "function": "helper_24",
+          "shape": "bl function:helper_24"
+        },
+        "657": {
+          "mnemonic": "bl",
+          "function": "decoder_names",
+          "shape": "bl function:decoder_names"
+        },
+        "663": {
+          "mnemonic": "bl",
+          "function": "decoder_signatures",
+          "shape": "bl function:decoder_signatures"
+        },
+        "675": {
+          "mnemonic": "bl",
+          "function": "helper_20",
+          "shape": "bl function:helper_20"
+        },
+        "677": {
+          "mnemonic": "bl",
+          "function": "helper_20",
+          "shape": "bl function:helper_20"
+        },
+        "690": {
+          "mnemonic": "bl",
+          "function": "helper_23",
+          "shape": "bl function:helper_23"
+        },
+        "744": {
+          "mnemonic": "bl",
+          "import": "memcpy",
+          "shape": "bl import:memcpy"
+        },
+        "751": {
+          "mnemonic": "bl",
+          "function": "helper_22",
+          "shape": "bl function:helper_22"
+        },
+        "754": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "762": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "788": {
+          "mnemonic": "bl",
+          "function": "helper_26",
+          "shape": "bl function:helper_26"
+        },
+        "808": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "816": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "839": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "847": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "855": {
+          "mnemonic": "bl",
+          "function": "helper_21",
+          "shape": "bl function:helper_21"
+        },
+        "871": {
+          "mnemonic": "bl",
+          "function": "helper_22",
+          "shape": "bl function:helper_22"
+        },
+        "877": {
+          "mnemonic": "bl",
+          "function": "helper_25",
+          "shape": "bl function:helper_25"
+        },
+        "902": {
+          "mnemonic": "bl",
+          "function": "helper_24",
+          "shape": "bl function:helper_24"
+        },
+        "905": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "913": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "938": {
+          "mnemonic": "bl",
+          "function": "helper_26",
+          "shape": "bl function:helper_26"
+        },
+        "954": {
+          "mnemonic": "bl",
+          "function": "helper_22",
+          "shape": "bl function:helper_22"
+        },
+        "957": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "973": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "999": {
+          "mnemonic": "bl",
+          "function": "helper_27",
+          "shape": "bl function:helper_27"
+        }
+      },
+      "constants": [
+        51,
+        361,
+        382,
+        403,
+        656,
+        659
+      ],
+      "string_calls": {
+        "52": {
+          "kind": "literal",
+          "text": "<init>",
+          "decoder": "decoder_names",
+          "argument_instruction": 51
+        },
+        "362": {
+          "kind": "literal",
+          "text": "java/lang/Class",
+          "decoder": "decoder_classes",
+          "argument_instruction": 361
+        },
+        "383": {
+          "kind": "literal",
+          "text": "java/lang/ClassLoader",
+          "decoder": "decoder_classes",
+          "argument_instruction": 382
+        },
+        "404": {
+          "kind": "literal",
+          "text": "java/nio/ByteBuffer",
+          "decoder": "decoder_classes",
+          "argument_instruction": 403
+        },
+        "657": {
+          "kind": "literal",
+          "text": "allocateDirect",
+          "decoder": "decoder_names",
+          "argument_instruction": 656
+        },
+        "663": {
+          "kind": "literal",
+          "text": "(I)Ljava/nio/ByteBuffer;",
+          "decoder": "decoder_signatures",
+          "argument_instruction": 659
+        }
+      },
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "5365c5e9e20863b8c6b2e70229a792dd487bd60939dab7d692959e311e34985d"
+    },
+    "helper_27": {
+      "instructions": 41,
+      "edges": {
+        "40": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "bc4a5d00548681e6fec93af34301ea011141baa742356ab81420499208ff71cb"
+    },
+    "role_mapper": {
+      "instructions": 14,
+      "edges": {
+        "6": {
+          "mnemonic": "adr",
+          "shape": "adr x9, <address>",
+          "literal": "f7fdf7fffef9fbf2f8f0f4faf1f3f5fc"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "76a4607ac06723ad70f40b6e222257015feccecaf3a5edc9d32e584eb05589da"
+    },
+    "helper_22": {
+      "instructions": 33,
+      "edges": {
+        "11": {
+          "mnemonic": "bl",
+          "function": "helper_24",
+          "shape": "bl function:helper_24"
+        },
+        "32": {
+          "mnemonic": "b",
+          "function": "helper_24",
+          "shape": "b function:helper_24"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "81968afcc884167469e0da47bf1d9fde7a9f1d91dbb14bc58a7d96d6d23bdd49"
+    },
+    "helper_24": {
+      "instructions": 68,
+      "edges": {
+        "13": {
+          "mnemonic": "bl",
+          "function": "helper_28",
+          "shape": "bl function:helper_28"
+        },
+        "19": {
+          "mnemonic": "bl",
+          "import": "memcpy",
+          "shape": "bl import:memcpy"
+        },
+        "60": {
+          "mnemonic": "bl",
+          "function": "helper_29",
+          "shape": "bl function:helper_29"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "dd577e4ba7ca57b1258b53c202036c9cea2f258e49bc6b963cd5f7ef38eedc86"
+    },
+    "helper_29": {
+      "instructions": 24,
+      "edges": {
+        "15": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "40ce7deb4a63c1b7af21205b8c18c03b4500adf09c44033592a01a130b90888f"
+    },
+    "helper_28": {
+      "instructions": 41,
+      "edges": {
+        "27": {
+          "mnemonic": "bl",
+          "import": "malloc",
+          "shape": "bl import:malloc"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "9878b9c1dd6a512fd37bf6e095488651f85876d4055135a9cf450f7a542adfd4"
+    },
+    "helper_26": {
+      "instructions": 41,
+      "edges": {
+        "40": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "dc754ae3307d48dbdb6d9fa1313ce82fb4d2c5783e7ab6dc9d6b940d313c583a"
+    },
+    "helper_25": {
+      "instructions": 41,
+      "edges": {
+        "40": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "d66aee91041cb236c34e9d9b4b6e577b860968071d899fd287e1a921dc7942be"
+    },
+    "helper_21": {
+      "instructions": 120,
+      "edges": {
+        "36": {
+          "mnemonic": "bl",
+          "function": "helper_30",
+          "shape": "bl function:helper_30"
+        },
+        "46": {
+          "mnemonic": "bl",
+          "import": "malloc",
+          "shape": "bl import:malloc"
+        },
+        "58": {
+          "mnemonic": "bl",
+          "function": "helper_30",
+          "shape": "bl function:helper_30"
+        },
+        "93": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "103": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "119": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "cb6fdfd4096b6a5260ccf9ab9e35df589e81f057b3749ba71f32e36388a4f888"
+    },
+    "helper_30": {
+      "instructions": 63,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "24d46457b7f88c029ea9b2dd249911e546873a23b6f9c7791bb3854068d89381"
+    },
+    "helper_23": {
+      "instructions": 41,
+      "edges": {
+        "40": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "a3253549337a986d2e7f0ff779189a38478e3a6f29a9763d1cefe83352cad623"
+    },
+    "helper_20": {
+      "instructions": 19,
+      "edges": {
+        "13": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "d7dff9921e6cc502a8b54b9e9c946bda0cdd383c5b65a898309abcc11e1efddf"
+    },
+    "helper_19": {
+      "instructions": 78,
+      "edges": {
+        "30": {
+          "mnemonic": "bl",
+          "function": "helper_31",
+          "shape": "bl function:helper_31"
+        },
+        "56": {
+          "mnemonic": "bl",
+          "function": "helper_31",
+          "shape": "bl function:helper_31"
+        },
+        "77": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "be908d72deb11ff4c65e8bb85c9fc900d2c091066df277d50d615331d006d004"
+    },
+    "helper_31": {
+      "instructions": 59,
+      "edges": {
+        "44": {
+          "mnemonic": "bl",
+          "function": "helper_16",
+          "shape": "bl function:helper_16"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "9a3d41cd6abc66d4b797e973dacd69ba2367382608713a9b4ab4d4f23b82960a"
+    },
+    "helper_16": {
+      "instructions": 36,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "d9901510cace0eaf80631ccbcacc15f843547200699fedefb620ff7424a4329d"
+    },
+    "helper_18": {
+      "instructions": 25,
+      "edges": {
+        "10": {
+          "mnemonic": "bl",
+          "function": "helper_29",
+          "shape": "bl function:helper_29"
+        },
+        "18": {
+          "mnemonic": "bl",
+          "function": "helper_29",
+          "shape": "bl function:helper_29"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "66da513630efaec343244f8999a347a50b72a6bcbaa17c385dc6121091fd47f4"
+    },
+    "helper_17": {
+      "instructions": 23,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "122a768f345c580e60ba7c317be96b2a3f5a4e0fd706a66eabbe5d88450e7cdb"
+    },
+    "validator": {
+      "instructions": 196,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "a0edae5c66538e1f06f9a028237984c345b6447a805855e72db7e46f1564649a"
+    },
+    "helper_15": {
+      "instructions": 44,
+      "edges": {
+        "8": {
+          "mnemonic": "bl",
+          "function": "helper_18",
+          "shape": "bl function:helper_18"
+        },
+        "23": {
+          "mnemonic": "bl",
+          "function": "parser",
+          "shape": "bl function:parser"
+        },
+        "27": {
+          "mnemonic": "bl",
+          "function": "helper_18",
+          "shape": "bl function:helper_18"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "3b9c2f1cbfd81c6858f5f13e00120baef7aaa9a0c0a345304eaf8740b7f949d9"
+    },
+    "parser": {
+      "instructions": 337,
+      "edges": {
+        "33": {
+          "mnemonic": "bl",
+          "function": "role_order",
+          "shape": "bl function:role_order"
+        },
+        "42": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "96": {
+          "mnemonic": "bl",
+          "function": "helper_32",
+          "shape": "bl function:helper_32"
+        },
+        "101": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        },
+        "106": {
+          "mnemonic": "bl",
+          "function": "selectors",
+          "shape": "bl function:selectors"
+        },
+        "133": {
+          "mnemonic": "adrp",
+          "shape": "adrp x9, <address>"
+        },
+        "134": {
+          "mnemonic": "adr",
+          "shape": "adr x8, <address>",
+          "function": "helper_33"
+        },
+        "139": {
+          "mnemonic": "adrp",
+          "shape": "adrp x9, <address>"
+        },
+        "142": {
+          "mnemonic": "adrp",
+          "shape": "adrp x8, <address>"
+        },
+        "144": {
+          "mnemonic": "adrp",
+          "shape": "adrp x8, <address>"
+        },
+        "145": {
+          "mnemonic": "adr",
+          "shape": "adr x9, <address>",
+          "function": "helper_34"
+        },
+        "152": {
+          "mnemonic": "bl",
+          "function": "helper_35",
+          "shape": "bl function:helper_35"
+        },
+        "158": {
+          "mnemonic": "bl",
+          "function": "helper_36",
+          "shape": "bl function:helper_36"
+        },
+        "162": {
+          "mnemonic": "bl",
+          "function": "helper_37",
+          "shape": "bl function:helper_37"
+        },
+        "167": {
+          "mnemonic": "bl",
+          "function": "helper_38",
+          "shape": "bl function:helper_38"
+        },
+        "174": {
+          "mnemonic": "bl",
+          "function": "helper_39",
+          "shape": "bl function:helper_39"
+        },
+        "179": {
+          "mnemonic": "bl",
+          "function": "helper_38",
+          "shape": "bl function:helper_38"
+        },
+        "186": {
+          "mnemonic": "bl",
+          "function": "role_order",
+          "shape": "bl function:role_order"
+        },
+        "195": {
+          "mnemonic": "bl",
+          "function": "role_mapper",
+          "shape": "bl function:role_mapper"
+        },
+        "205": {
+          "mnemonic": "bl",
+          "function": "helper_39",
+          "shape": "bl function:helper_39"
+        },
+        "210": {
+          "mnemonic": "bl",
+          "function": "helper_40",
+          "shape": "bl function:helper_40"
+        },
+        "243": {
+          "mnemonic": "bl",
+          "function": "helper_39",
+          "shape": "bl function:helper_39"
+        },
+        "248": {
+          "mnemonic": "bl",
+          "function": "helper_41",
+          "shape": "bl function:helper_41"
+        },
+        "255": {
+          "mnemonic": "bl",
+          "function": "helper_28",
+          "shape": "bl function:helper_28"
+        },
+        "264": {
+          "mnemonic": "bl",
+          "function": "helper_42",
+          "shape": "bl function:helper_42"
+        },
+        "270": {
+          "mnemonic": "bl",
+          "function": "helper_43",
+          "shape": "bl function:helper_43"
+        },
+        "294": {
+          "mnemonic": "bl",
+          "function": "helper_44",
+          "shape": "bl function:helper_44"
+        },
+        "311": {
+          "mnemonic": "bl",
+          "function": "helper_29",
+          "shape": "bl function:helper_29"
+        },
+        "336": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {
+        "138": {
+          "base_instruction": 133,
+          "literal": "00000004000000000040000000000000"
+        },
+        "141": {
+          "base_instruction": 139,
+          "literal": "00000002000000000000100000000000"
+        },
+        "143": {
+          "base_instruction": 142,
+          "literal": "00040000000000000000010000000000"
+        },
+        "147": {
+          "base_instruction": 144,
+          "literal": "00100000000000004000000000000000"
+        }
+      },
+      "switches": {},
+      "shape_sha256": "54152e6a2923e134f213cf5c5894a8ea437df4b9f1dc4535c44c718884a31956"
+    },
+    "helper_44": {
+      "instructions": 48,
+      "edges": {
+        "47": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "c0bf02db30511ce344e13f48c5cf618902b35240c6d7b3f47a926598d7fd5ab2"
+    },
+    "helper_43": {
+      "instructions": 150,
+      "edges": {
+        "16": {
+          "mnemonic": "bl",
+          "function": "helper_38",
+          "shape": "bl function:helper_38"
+        },
+        "21": {
+          "mnemonic": "bl",
+          "function": "helper_38",
+          "shape": "bl function:helper_38"
+        },
+        "26": {
+          "mnemonic": "bl",
+          "function": "helper_45",
+          "shape": "bl function:helper_45"
+        },
+        "45": {
+          "mnemonic": "bl",
+          "function": "helper_38",
+          "shape": "bl function:helper_38"
+        },
+        "70": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        },
+        "149": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "85a2ef3f1945d21fbfda171a6308bc4b845a480be58c7605624b4a5608824c5a"
+    },
+    "helper_38": {
+      "instructions": 39,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "53e10f9427b7d28f24c369913e98c2ebc58be03ed51ef20fe57f40e80c7ce032"
+    },
+    "helper_45": {
+      "instructions": 41,
+      "edges": {
+        "40": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "250961823e68280cb015367ac7f5e685f41337ff39e97523a851fc37aca649e5"
+    },
+    "helper_42": {
+      "instructions": 36,
+      "edges": {
+        "22": {
+          "mnemonic": "bl",
+          "function": "helper_25",
+          "shape": "bl function:helper_25"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "d3f6d2ef5dca929ca462ad9069ac9a6be3e5e2f1b6afab0175007f5aa9fb4f05"
+    },
+    "helper_41": {
+      "instructions": 39,
+      "edges": {
+        "10": {
+          "mnemonic": "bl",
+          "function": "helper_38",
+          "shape": "bl function:helper_38"
+        },
+        "15": {
+          "mnemonic": "bl",
+          "function": "helper_46",
+          "shape": "bl function:helper_46"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "7ad1dfa2d9c919cc33bbd60167142d9cc0cd958d92060834a8ecbcb519e87717"
+    },
+    "helper_46": {
+      "instructions": 41,
+      "edges": {
+        "40": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "86c1a5b17f4f8a16c7360dc9e450d893f0adbec6e6406b5d0d60cec5b0874132"
+    },
+    "helper_39": {
+      "instructions": 88,
+      "edges": {
+        "15": {
+          "mnemonic": "bl",
+          "function": "helper_38",
+          "shape": "bl function:helper_38"
+        },
+        "57": {
+          "mnemonic": "bl",
+          "function": "helper_25",
+          "shape": "bl function:helper_25"
+        },
+        "87": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "9910fcae8d82222b333fb49bc37a40ca207bbdba8aa6b11bde3a58935ff0fa41"
+    },
+    "helper_40": {
+      "instructions": 77,
+      "edges": {
+        "15": {
+          "mnemonic": "bl",
+          "function": "helper_38",
+          "shape": "bl function:helper_38"
+        },
+        "21": {
+          "mnemonic": "bl",
+          "function": "helper_32",
+          "shape": "bl function:helper_32"
+        },
+        "26": {
+          "mnemonic": "adr",
+          "shape": "adr x22, <address>",
+          "function": "helper_33"
+        },
+        "33": {
+          "mnemonic": "bl",
+          "function": "helper_47",
+          "shape": "bl function:helper_47"
+        },
+        "38": {
+          "mnemonic": "bl",
+          "function": "helper_28",
+          "shape": "bl function:helper_28"
+        },
+        "49": {
+          "mnemonic": "bl",
+          "function": "helper_47",
+          "shape": "bl function:helper_47"
+        },
+        "74": {
+          "mnemonic": "bl",
+          "function": "helper_29",
+          "shape": "bl function:helper_29"
+        },
+        "76": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "3d62f1e7f421348f8c2f671a5b43888fe55e66c26c75fc7a07d5a704f0b7c8ec"
+    },
+    "helper_47": {
+      "instructions": 136,
+      "edges": {
+        "27": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        },
+        "46": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "55": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "135": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "fa5e6ab7c61b94407227c87095310743304d5ffe8e3989b0001fbf0e4b8b99d4"
+    },
+    "helper_48": {
+      "instructions": 56,
+      "edges": {
+        "6": {
+          "mnemonic": "bl",
+          "function": "helper_49",
+          "shape": "bl function:helper_49"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "ee787f94e9ea689efe71879250b140b7e23dd302f2effc3a3eee5568604b0e46"
+    },
+    "helper_49": {
+      "instructions": 35,
+      "edges": {
+        "21": {
+          "mnemonic": "bl",
+          "function": "helper_50",
+          "shape": "bl function:helper_50"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "4a7bafb5cb19920738214afe4152e00775aa8fc191c3aa222b0bb24b50a79a1c"
+    },
+    "helper_50": {
+      "instructions": 24,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "2ee9c268212b0ff4f0c4e57284b349d06bdb840a55d5f8d634def16abe9c661c"
+    },
+    "helper_33": {
+      "instructions": 46,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "e617b3d709d0add105ab05e8f6e8495398012eb90656398170ff95688784ecbd"
+    },
+    "helper_32": {
+      "instructions": 37,
+      "edges": {},
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "e50c8bb222c557ab6cdbf4eac58ade92740318101290d403dc9d6e5dc8943604"
+    },
+    "role_order": {
+      "instructions": 17,
+      "edges": {
+        "4": {
+          "mnemonic": "adr",
+          "shape": "adr x8, <address>",
+          "literal": "737d7f75797e707b74767772717c"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "aca2d697d03d0072ad1d300599b06cfb8580c424b7e257723a0efaed8d6fdce8"
+    },
+    "helper_37": {
+      "instructions": 36,
+      "edges": {
+        "23": {
+          "mnemonic": "bl",
+          "function": "helper_26",
+          "shape": "bl function:helper_26"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "5f6b1e7af2b7e1b8639d43fb46d8c0ea4763f466a2e6d1616796ae4a427012dc"
+    },
+    "helper_36": {
+      "instructions": 35,
+      "edges": {
+        "21": {
+          "mnemonic": "bl",
+          "function": "helper_51",
+          "shape": "bl function:helper_51"
+        },
+        "24": {
+          "mnemonic": "bl",
+          "function": "helper_52",
+          "shape": "bl function:helper_52"
+        },
+        "27": {
+          "mnemonic": "bl",
+          "function": "helper_53",
+          "shape": "bl function:helper_53"
+        },
+        "30": {
+          "mnemonic": "bl",
+          "function": "helper_54",
+          "shape": "bl function:helper_54"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "67beaa12230aba3234fdac4eb3a9848edb42f79ca659cd4bd0bc4064972a6b45"
+    },
+    "helper_54": {
+      "instructions": 120,
+      "edges": {
+        "14": {
+          "mnemonic": "bl",
+          "function": "decoder_names",
+          "shape": "bl function:decoder_names"
+        },
+        "17": {
+          "mnemonic": "bl",
+          "function": "decoder_signatures",
+          "shape": "bl function:decoder_signatures"
+        },
+        "20": {
+          "mnemonic": "adr",
+          "shape": "adr x23, <address>",
+          "literal": "00"
+        },
+        "48": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "57": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "62": {
+          "mnemonic": "bl",
+          "function": "decoder_names",
+          "shape": "bl function:decoder_names"
+        },
+        "65": {
+          "mnemonic": "bl",
+          "function": "decoder_signatures",
+          "shape": "bl function:decoder_signatures"
+        },
+        "95": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "104": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "119": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [
+        13,
+        16,
+        61,
+        64
+      ],
+      "string_calls": {
+        "14": {
+          "kind": "literal",
+          "text": "get",
+          "decoder": "decoder_names",
+          "argument_instruction": 13
+        },
+        "17": {
+          "kind": "literal",
+          "text": "(I)Ljava/lang/Object;",
+          "decoder": "decoder_signatures",
+          "argument_instruction": 16
+        },
+        "62": {
+          "kind": "literal",
+          "text": "longValue",
+          "decoder": "decoder_names",
+          "argument_instruction": 61
+        },
+        "65": {
+          "kind": "literal",
+          "text": "()J",
+          "decoder": "decoder_signatures",
+          "argument_instruction": 64
+        }
+      },
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "b44f94c57106aa63734729d9b9a2f81521ad6e279917bfcad0164f71bfac5dfc"
+    },
+    "helper_53": {
+      "instructions": 196,
+      "edges": {
+        "14": {
+          "mnemonic": "bl",
+          "function": "decoder_classes",
+          "shape": "bl function:decoder_classes"
+        },
+        "17": {
+          "mnemonic": "adr",
+          "shape": "adr x23, <address>",
+          "literal": "00"
+        },
+        "33": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "46": {
+          "mnemonic": "bl",
+          "function": "decoder_names",
+          "shape": "bl function:decoder_names"
+        },
+        "49": {
+          "mnemonic": "bl",
+          "function": "decoder_signatures",
+          "shape": "bl function:decoder_signatures"
+        },
+        "79": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "88": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "93": {
+          "mnemonic": "bl",
+          "function": "decoder_names",
+          "shape": "bl function:decoder_names"
+        },
+        "96": {
+          "mnemonic": "bl",
+          "function": "decoder_signatures",
+          "shape": "bl function:decoder_signatures"
+        },
+        "126": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "135": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "140": {
+          "mnemonic": "bl",
+          "function": "decoder_names",
+          "shape": "bl function:decoder_names"
+        },
+        "143": {
+          "mnemonic": "bl",
+          "function": "decoder_signatures",
+          "shape": "bl function:decoder_signatures"
+        },
+        "173": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "182": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "195": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [
+        13,
+        45,
+        48,
+        92,
+        95,
+        139,
+        142
+      ],
+      "string_calls": {
+        "14": {
+          "kind": "literal",
+          "text": "java/lang/Number",
+          "decoder": "decoder_classes",
+          "argument_instruction": 13
+        },
+        "46": {
+          "kind": "literal",
+          "text": "<init>",
+          "decoder": "decoder_names",
+          "argument_instruction": 45
+        },
+        "49": {
+          "kind": "literal",
+          "text": "(Ljava/lang/String;)V",
+          "decoder": "decoder_signatures",
+          "argument_instruction": 48
+        },
+        "93": {
+          "kind": "literal",
+          "text": "opt",
+          "decoder": "decoder_names",
+          "argument_instruction": 92
+        },
+        "96": {
+          "kind": "literal",
+          "text": "(Ljava/lang/String;)Ljava/lang/Object;",
+          "decoder": "decoder_signatures",
+          "argument_instruction": 95
+        },
+        "140": {
+          "kind": "literal",
+          "text": "length",
+          "decoder": "decoder_names",
+          "argument_instruction": 139
+        },
+        "143": {
+          "kind": "literal",
+          "text": "()I",
+          "decoder": "decoder_signatures",
+          "argument_instruction": 142
+        }
+      },
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "17e7ebbaf18d2debfa56bf8253132e6ce648f3f0382ee436a16eea9cde615e2c"
+    },
+    "helper_52": {
+      "instructions": 148,
+      "edges": {
+        "13": {
+          "mnemonic": "bl",
+          "function": "decoder_classes",
+          "shape": "bl function:decoder_classes"
+        },
+        "16": {
+          "mnemonic": "adr",
+          "shape": "adr x22, <address>",
+          "literal": "00"
+        },
+        "32": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "46": {
+          "mnemonic": "bl",
+          "function": "decoder_classes",
+          "shape": "bl function:decoder_classes"
+        },
+        "64": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "78": {
+          "mnemonic": "bl",
+          "function": "decoder_classes",
+          "shape": "bl function:decoder_classes"
+        },
+        "96": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "110": {
+          "mnemonic": "bl",
+          "function": "decoder_classes",
+          "shape": "bl function:decoder_classes"
+        },
+        "128": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "147": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [
+        12,
+        45,
+        77,
+        109
+      ],
+      "string_calls": {
+        "13": {
+          "kind": "literal",
+          "text": "org/json/JSONArray",
+          "decoder": "decoder_classes",
+          "argument_instruction": 12
+        },
+        "46": {
+          "kind": "literal",
+          "text": "java/lang/String",
+          "decoder": "decoder_classes",
+          "argument_instruction": 45
+        },
+        "78": {
+          "kind": "literal",
+          "text": "java/lang/Integer",
+          "decoder": "decoder_classes",
+          "argument_instruction": 77
+        },
+        "110": {
+          "kind": "literal",
+          "text": "java/lang/Long",
+          "decoder": "decoder_classes",
+          "argument_instruction": 109
+        }
+      },
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "b1fcb40a5fa8505ce906e4e8e0c9928d2aaade1e4f1777494a82eb7ef7ebee58"
+    },
+    "helper_51": {
+      "instructions": 52,
+      "edges": {
+        "13": {
+          "mnemonic": "bl",
+          "function": "decoder_classes",
+          "shape": "bl function:decoder_classes"
+        },
+        "16": {
+          "mnemonic": "adr",
+          "shape": "adr x10, <address>",
+          "literal": "00"
+        },
+        "32": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "51": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {
+        "13": {
+          "kind": "literal",
+          "text": "org/json/JSONObject",
+          "decoder": "decoder_classes",
+          "identifier": 0
+        }
+      },
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "cbb5111700a4b829551f3c0390ed90de4923d84d4febc28b3431b9aef38bf687"
+    },
+    "helper_35": {
+      "instructions": 157,
+      "edges": {
+        "50": {
+          "mnemonic": "bl",
+          "function": "helper_55",
+          "shape": "bl function:helper_55"
+        },
+        "53": {
+          "mnemonic": "bl",
+          "function": "helper_56",
+          "shape": "bl function:helper_56"
+        },
+        "73": {
+          "mnemonic": "bl",
+          "function": "helper_55",
+          "shape": "bl function:helper_55"
+        },
+        "76": {
+          "mnemonic": "bl",
+          "function": "helper_56",
+          "shape": "bl function:helper_56"
+        },
+        "156": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "8aaee77e664f6a9615fafd50c00ba55f2c8ecb99cf26492d242848b57ce6eb3c"
+    },
+    "helper_56": {
+      "instructions": 98,
+      "edges": {
+        "12": {
+          "mnemonic": "bl",
+          "function": "helper_57",
+          "shape": "bl function:helper_57"
+        },
+        "17": {
+          "mnemonic": "bl",
+          "function": "helper_49",
+          "shape": "bl function:helper_49"
+        },
+        "27": {
+          "mnemonic": "bl",
+          "function": "helper_58",
+          "shape": "bl function:helper_58"
+        },
+        "31": {
+          "mnemonic": "bl",
+          "function": "helper_57",
+          "shape": "bl function:helper_57"
+        },
+        "36": {
+          "mnemonic": "bl",
+          "function": "helper_49",
+          "shape": "bl function:helper_49"
+        },
+        "40": {
+          "mnemonic": "bl",
+          "function": "helper_59",
+          "shape": "bl function:helper_59"
+        },
+        "97": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "898ae274484a97300b98743fa56cd9e521068a0d426349a675f3504432ef22ce"
+    },
+    "helper_59": {
+      "instructions": 249,
+      "edges": {
+        "30": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "78": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "92": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "122": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "149": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        },
+        "171": {
+          "mnemonic": "bl",
+          "import": "memcmp",
+          "shape": "bl import:memcmp"
+        },
+        "181": {
+          "mnemonic": "bl",
+          "function": "helper_58",
+          "shape": "bl function:helper_58"
+        },
+        "188": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "205": {
+          "mnemonic": "bl",
+          "import": "memcmp",
+          "shape": "bl import:memcmp"
+        },
+        "248": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "d7648a7b84aa2392abcc792446a38b4768c7a653d84c2157ba150fb6b66ee1b4"
+    },
+    "helper_58": {
+      "instructions": 389,
+      "edges": {
+        "24": {
+          "mnemonic": "bl",
+          "function": "helper_49",
+          "shape": "bl function:helper_49"
+        },
+        "64": {
+          "mnemonic": "adrp",
+          "shape": "adrp x1, <address>"
+        },
+        "85": {
+          "mnemonic": "bl",
+          "function": "helper_49",
+          "shape": "bl function:helper_49"
+        },
+        "97": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "104": {
+          "mnemonic": "bl",
+          "function": "helper_49",
+          "shape": "bl function:helper_49"
+        },
+        "118": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "125": {
+          "mnemonic": "bl",
+          "function": "helper_49",
+          "shape": "bl function:helper_49"
+        },
+        "160": {
+          "mnemonic": "bl",
+          "function": "helper_60",
+          "shape": "bl function:helper_60"
+        },
+        "164": {
+          "mnemonic": "adrp",
+          "shape": "adrp x1, <address>"
+        },
+        "167": {
+          "mnemonic": "adr",
+          "shape": "adr x1, <address>",
+          "literal": "7472756500"
+        },
+        "169": {
+          "mnemonic": "bl",
+          "function": "helper_61",
+          "shape": "bl function:helper_61"
+        },
+        "184": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "225": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "232": {
+          "mnemonic": "bl",
+          "function": "helper_49",
+          "shape": "bl function:helper_49"
+        },
+        "243": {
+          "mnemonic": "bl",
+          "function": "helper_49",
+          "shape": "bl function:helper_49"
+        },
+        "257": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "264": {
+          "mnemonic": "bl",
+          "function": "helper_49",
+          "shape": "bl function:helper_49"
+        },
+        "276": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "283": {
+          "mnemonic": "bl",
+          "function": "helper_49",
+          "shape": "bl function:helper_49"
+        },
+        "291": {
+          "mnemonic": "bl",
+          "function": "helper_49",
+          "shape": "bl function:helper_49"
+        },
+        "298": {
+          "mnemonic": "bl",
+          "function": "helper_62",
+          "shape": "bl function:helper_62"
+        },
+        "302": {
+          "mnemonic": "bl",
+          "function": "helper_49",
+          "shape": "bl function:helper_49"
+        },
+        "310": {
+          "mnemonic": "bl",
+          "function": "helper_62",
+          "shape": "bl function:helper_62"
+        },
+        "314": {
+          "mnemonic": "bl",
+          "function": "helper_49",
+          "shape": "bl function:helper_49"
+        },
+        "321": {
+          "mnemonic": "bl",
+          "function": "helper_62",
+          "shape": "bl function:helper_62"
+        },
+        "325": {
+          "mnemonic": "bl",
+          "function": "helper_49",
+          "shape": "bl function:helper_49"
+        },
+        "388": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {
+        "65": {
+          "base_instruction": 64,
+          "literal": "6e756c6c0074"
+        },
+        "165": {
+          "base_instruction": 164,
+          "literal": "66616c736500"
+        }
+      },
+      "switches": {},
+      "shape_sha256": "3305df705ae6998f295575e3e337b9e301b649364463d4f10a93d931fc69ee91"
+    },
+    "helper_62": {
+      "instructions": 25,
+      "edges": {
+        "12": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "bd50ac8416d6dacd570c7f9dcae91a88d08dd4408a8181bec56c3a94da88c15a"
+    },
+    "helper_61": {
+      "instructions": 38,
+      "edges": {
+        "16": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "37": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "e16aaa3c0ba0fb2e6b875c428502d9551ac4cce9029dda659ea1e339cd7d1575"
+    },
+    "helper_60": {
+      "instructions": 223,
+      "edges": {
+        "21": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "31": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "44": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "60": {
+          "mnemonic": "bl",
+          "function": "helper_63",
+          "shape": "bl function:helper_63"
+        },
+        "70": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "79": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "88": {
+          "mnemonic": "bl",
+          "function": "helper_63",
+          "shape": "bl function:helper_63"
+        },
+        "103": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "195": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "222": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "641f9bb866cddfdcdd9a6099cfeebeae3f8568a0b3252c008e5b46e00ff90ee1"
+    },
+    "helper_63": {
+      "instructions": 53,
+      "edges": {
+        "17": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "52": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "ae00ad0707f8c23a4733e078eeeb9ac8a73d29ed1f01cd25de6238ca0e19079d"
+    },
+    "helper_57": {
+      "instructions": 44,
+      "edges": {
+        "16": {
+          "mnemonic": "bl",
+          "function": "helper_49",
+          "shape": "bl function:helper_49"
+        },
+        "26": {
+          "mnemonic": "bl",
+          "function": "helper_48",
+          "shape": "bl function:helper_48"
+        },
+        "43": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "049699b650324565ab88b98c9812bdebc06e205ce6de61bd5daf43423a8a7a19"
+    },
+    "helper_55": {
+      "instructions": 54,
+      "edges": {
+        "15": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "5827df15fac1bf5f95c565e707c2ab940fce69c7ccf51f7032a1d0cf4d050407"
+    },
+    "helper_34": {
+      "instructions": 6,
+      "edges": {
+        "5": {
+          "mnemonic": "b",
+          "function": "helper_64",
+          "shape": "b function:helper_64"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "ce3a69804c85aebdfb9b2449dbd7f56dc9f6fc29a2fb7b648471484cab28c29d"
+    },
+    "helper_64": {
+      "instructions": 214,
+      "edges": {
+        "50": {
+          "mnemonic": "bl",
+          "function": "helper_28",
+          "shape": "bl function:helper_28"
+        },
+        "70": {
+          "mnemonic": "bl",
+          "function": "helper_29",
+          "shape": "bl function:helper_29"
+        },
+        "73": {
+          "mnemonic": "adr",
+          "shape": "adr x24, <address>",
+          "literal": "00"
+        },
+        "78": {
+          "mnemonic": "bl",
+          "function": "decoder_classes",
+          "shape": "bl function:decoder_classes"
+        },
+        "96": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "109": {
+          "mnemonic": "bl",
+          "function": "decoder_names",
+          "shape": "bl function:decoder_names"
+        },
+        "112": {
+          "mnemonic": "bl",
+          "function": "decoder_signatures",
+          "shape": "bl function:decoder_signatures"
+        },
+        "142": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "151": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "187": {
+          "mnemonic": "bl",
+          "function": "helper_65",
+          "shape": "bl function:helper_65"
+        },
+        "213": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [
+        77,
+        111
+      ],
+      "string_calls": {
+        "78": {
+          "kind": "literal",
+          "text": "java/lang/Double",
+          "decoder": "decoder_classes",
+          "argument_instruction": 77
+        },
+        "109": {
+          "kind": "literal",
+          "text": "parseDouble",
+          "decoder": "decoder_names",
+          "identifier": 0
+        },
+        "112": {
+          "kind": "literal",
+          "text": "(Ljava/lang/String;)D",
+          "decoder": "decoder_signatures",
+          "argument_instruction": 111
+        }
+      },
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "4a09624853457e1b9bd66318eca8d538b237d785326a2b1dcd6c2eaf819fc98a"
+    },
+    "helper_65": {
+      "instructions": 41,
+      "edges": {
+        "40": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "a8c53cd28fb9007cc274a1809aad2b3771c92c7e2c2ccac9dd087bce4ee06611"
+    },
+    "selectors": {
+      "instructions": 93,
+      "edges": {
+        "29": {
+          "mnemonic": "bl",
+          "function": "selector_value",
+          "shape": "bl function:selector_value"
+        },
+        "37": {
+          "mnemonic": "bl",
+          "function": "formatter",
+          "shape": "bl function:formatter"
+        },
+        "55": {
+          "mnemonic": "bl",
+          "import": "memcmp",
+          "shape": "bl import:memcmp"
+        },
+        "92": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "04e6e994213fde808253466acfc6e1af690024c99b84e5d21f0296dde27fb3be"
+    },
+    "formatter": {
+      "instructions": 67,
+      "edges": {
+        "66": {
+          "mnemonic": "bl",
+          "import": "__stack_chk_fail",
+          "shape": "bl import:__stack_chk_fail"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "e07e5cbd7b1942bed7e196c47ec707579f3b17d04e396447684e8ea1e29b0f2e"
+    },
+    "selector_value": {
+      "instructions": 37,
+      "edges": {
+        "9": {
+          "mnemonic": "bl",
+          "function": "selector_index",
+          "shape": "bl function:selector_index"
+        },
+        "14": {
+          "mnemonic": "adr",
+          "shape": "adr x9, <address>"
+        },
+        "15": {
+          "mnemonic": "adr",
+          "shape": "adr x10, <address>"
+        },
+        "17": {
+          "mnemonic": "adr",
+          "shape": "adr x11, <address>"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "69505a2a98b8c3756a5da91dd890ddaaf4211f6afa9c94b808f4c50db154db01"
+    },
+    "selector_index": {
+      "instructions": 3,
+      "edges": {
+        "0": {
+          "mnemonic": "adr",
+          "shape": "adr x8, <address>"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {},
+      "switches": {},
+      "shape_sha256": "ccad926b09a3fd3d5d3e4435885771c3efe476b1bf828d60ebaec8dcbc4c15e3"
+    },
+    "helper_14": {
+      "instructions": 122,
+      "edges": {
+        "9": {
+          "mnemonic": "adrp",
+          "shape": "adrp x23, <address>"
+        },
+        "11": {
+          "mnemonic": "bl",
+          "import": "pthread_getspecific",
+          "shape": "bl import:pthread_getspecific"
+        },
+        "23": {
+          "mnemonic": "bl",
+          "import": "realloc",
+          "shape": "bl import:realloc"
+        },
+        "31": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        },
+        "33": {
+          "mnemonic": "adrp",
+          "shape": "adrp x20, <address>"
+        },
+        "35": {
+          "mnemonic": "adr",
+          "shape": "adr x1, <address>",
+          "function": "helper_66"
+        },
+        "37": {
+          "mnemonic": "bl",
+          "import": "pthread_once",
+          "shape": "bl import:pthread_once"
+        },
+        "39": {
+          "mnemonic": "bl",
+          "import": "pthread_mutex_lock",
+          "shape": "bl import:pthread_mutex_lock"
+        },
+        "42": {
+          "mnemonic": "adrp",
+          "shape": "adrp x8, <address>"
+        },
+        "48": {
+          "mnemonic": "adrp",
+          "shape": "adrp x0, <address>"
+        },
+        "50": {
+          "mnemonic": "bl",
+          "import": "pthread_mutex_unlock",
+          "shape": "bl import:pthread_mutex_unlock"
+        },
+        "51": {
+          "mnemonic": "adrp",
+          "shape": "adrp x23, <address>"
+        },
+        "53": {
+          "mnemonic": "bl",
+          "import": "pthread_getspecific",
+          "shape": "bl import:pthread_getspecific"
+        },
+        "60": {
+          "mnemonic": "bl",
+          "import": "malloc",
+          "shape": "bl import:malloc"
+        },
+        "66": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        },
+        "72": {
+          "mnemonic": "bl",
+          "import": "pthread_setspecific",
+          "shape": "bl import:pthread_setspecific"
+        },
+        "93": {
+          "mnemonic": "bl",
+          "import": "malloc",
+          "shape": "bl import:malloc"
+        },
+        "104": {
+          "mnemonic": "bl",
+          "import": "memcpy",
+          "shape": "bl import:memcpy"
+        },
+        "109": {
+          "mnemonic": "bl",
+          "import": "memset",
+          "shape": "bl import:memset"
+        },
+        "118": {
+          "mnemonic": "bl",
+          "import": "abort",
+          "shape": "bl import:abort"
+        },
+        "119": {
+          "mnemonic": "bl",
+          "import": "abort",
+          "shape": "bl import:abort"
+        },
+        "120": {
+          "mnemonic": "bl",
+          "import": "abort",
+          "shape": "bl import:abort"
+        },
+        "121": {
+          "mnemonic": "bl",
+          "import": "abort",
+          "shape": "bl import:abort"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {
+        "10": {
+          "base_instruction": 9,
+          "global_offset": 17036
+        },
+        "34": {
+          "base_instruction": 33,
+          "global_offset": 17040
+        },
+        "43": {
+          "base_instruction": 42,
+          "global_offset": 17048
+        },
+        "46": {
+          "base_instruction": 42,
+          "global_offset": 17048
+        },
+        "49": {
+          "base_instruction": 48,
+          "global_offset": 17056
+        },
+        "52": {
+          "base_instruction": 51,
+          "global_offset": 17036
+        },
+        "69": {
+          "base_instruction": 51,
+          "global_offset": 17036
+        }
+      },
+      "switches": {},
+      "shape_sha256": "668da12980e7cf7a550aa26644ca8997eb24505ab1217d7ff4025331565a0ac2"
+    },
+    "helper_66": {
+      "instructions": 14,
+      "edges": {
+        "2": {
+          "mnemonic": "adrp",
+          "shape": "adrp x0, <address>"
+        },
+        "4": {
+          "mnemonic": "adr",
+          "shape": "adr x1, <address>",
+          "function": "helper_67"
+        },
+        "5": {
+          "mnemonic": "bl",
+          "import": "pthread_key_create",
+          "shape": "bl import:pthread_key_create"
+        },
+        "7": {
+          "mnemonic": "adrp",
+          "shape": "adrp x8, <address>"
+        },
+        "13": {
+          "mnemonic": "bl",
+          "import": "abort",
+          "shape": "bl import:abort"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {
+        "3": {
+          "base_instruction": 2,
+          "global_offset": 17036
+        },
+        "9": {
+          "base_instruction": 7,
+          "global_offset": 17032
+        }
+      },
+      "switches": {},
+      "shape_sha256": "715a05214e12f83ac8992c836c177f984ee0c6e8a37dae5a02f48febe39f3056"
+    },
+    "helper_67": {
+      "instructions": 34,
+      "edges": {
+        "7": {
+          "mnemonic": "adrp",
+          "shape": "adrp x9, <address>"
+        },
+        "14": {
+          "mnemonic": "b",
+          "import": "pthread_setspecific",
+          "shape": "b import:pthread_setspecific"
+        },
+        "26": {
+          "mnemonic": "bl",
+          "import": "free",
+          "shape": "bl import:free"
+        },
+        "33": {
+          "mnemonic": "b",
+          "import": "free",
+          "shape": "b import:free"
+        }
+      },
+      "constants": [],
+      "string_calls": {},
+      "address_uses": {
+        "11": {
+          "base_instruction": 7,
+          "global_offset": 17036
+        }
+      },
+      "switches": {},
+      "shape_sha256": "dcd5b615bd3b5fc339ea708ce6c2894281ccce3285e0a29103db8e5ea2322406"
+    }
+  },
+  "literals": [],
+  "tail_calls": true,
+  "byte_switches": true,
+  "role_indices": {
+    "loader_class": 0,
+    "loader_constructor_signature": 2,
+    "activity_loader_method": 3,
+    "activity_loader_signature": 4,
+    "load_class_method": 5,
+    "load_class_signature": 6,
+    "entry_class": 7,
+    "entry_constructor_signature": 8,
+    "entry_method": 9,
+    "entry_signature": 10,
+    "class_class": 11,
+    "class_lookup_method": 12,
+    "class_lookup_signature": 13,
+    "constructor_name": 14
+  },
+  "isolated_decoders": [
+    "decoder_signatures",
+    "decoder_classes",
+    "decoder_names"
+  ],
+  "selector_arrays": {
+    "xor": [
+      "selector_value",
+      14
+    ],
+    "add": [
+      "selector_value",
+      15
+    ],
+    "cipher": [
+      "selector_value",
+      17
+    ],
+    "mapping": [
+      "selector_index",
+      0
+    ]
+  },
+  "trigger_sha256": "67d0e85a564433ab03289e180be69638bf2dcf3fc877665150ad2a57e18a5fa2",
+  "jni_roles": [
+    {
+      "instruction": 467,
+      "slot": 904,
+      "name_index": 13,
+      "signature_index": 14
+    },
+    {
+      "instruction": 602,
+      "slot": 264,
+      "name_index": 4,
+      "signature_index": 5
+    },
+    {
+      "instruction": 774,
+      "slot": 264,
+      "name_index": 15,
+      "signature_index": 3
+    },
+    {
+      "instruction": 828,
+      "slot": 264,
+      "name_index": 6,
+      "signature_index": 7
+    },
+    {
+      "instruction": 925,
+      "slot": 264,
+      "name_index": 15,
+      "signature_index": 9
+    },
+    {
+      "instruction": 985,
+      "slot": 264,
+      "name_index": 10,
+      "signature_index": 11
+    }
+  ],
+  "auxiliary_decoders": {
+    "decoder_network": {
+      "format": "apk-defense.family4-core-model/v1",
+      "functions": {
+        "loader": {
+          "instructions": 76,
+          "edges": {
+            "8": {
+              "mnemonic": "bl",
+              "function": "helper_1",
+              "shape": "bl function:helper_1"
+            },
+            "21": {
+              "mnemonic": "adr",
+              "shape": "adr x9, <address>"
+            },
+            "22": {
+              "mnemonic": "adr",
+              "shape": "adr x10, <address>"
+            },
+            "28": {
+              "mnemonic": "adr",
+              "shape": "adr x10, <address>"
+            },
+            "32": {
+              "mnemonic": "adr",
+              "shape": "adr x10, <address>"
+            },
+            "45": {
+              "mnemonic": "bl",
+              "import": "calloc",
+              "shape": "bl import:calloc"
+            },
+            "58": {
+              "mnemonic": "adr",
+              "shape": "adr x11, <address>"
+            }
+          },
+          "constants": [],
+          "string_calls": {},
+          "address_uses": {},
+          "switches": {},
+          "shape_sha256": "edf01e7def38b94e5adddf0f16a23f73787f0faa47f172ee384bb56ddd875429"
+        },
+        "helper_1": {
+          "instructions": 135,
+          "edges": {},
+          "constants": [],
+          "string_calls": {},
+          "address_uses": {},
+          "switches": {},
+          "shape_sha256": "ff6375791a2f5cffbe5e9bb58d7c3d74e0fcb53ae7568e4e6fa5905716b29fdf"
+        }
+      },
+      "literals": [],
+      "tail_calls": true,
+      "byte_switches": true,
+      "isolated_decoders": []
+    },
+    "decoder_misc": {
+      "format": "apk-defense.family4-core-model/v1",
+      "functions": {
+        "loader": {
+          "instructions": 96,
+          "edges": {
+            "12": {
+              "mnemonic": "adr",
+              "shape": "adr x9, <address>"
+            },
+            "21": {
+              "mnemonic": "adr",
+              "shape": "adr x10, <address>"
+            },
+            "61": {
+              "mnemonic": "bl",
+              "import": "calloc",
+              "shape": "bl import:calloc"
+            },
+            "73": {
+              "mnemonic": "adr",
+              "shape": "adr x10, <address>"
+            }
+          },
+          "constants": [],
+          "string_calls": {},
+          "address_uses": {},
+          "switches": {},
+          "shape_sha256": "a79546b8e017e6ba71f209d23a093dc4fe935d9aa4d5a28ce15ebbc2701968e3"
+        }
+      },
+      "literals": [],
+      "tail_calls": true,
+      "byte_switches": true,
+      "isolated_decoders": []
+    }
+  },
+  "review_report": "reports/family4/com.wasswaydhola.pocketsun/02_native_analysis.md"
+}

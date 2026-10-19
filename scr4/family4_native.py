@@ -1008,6 +1008,9 @@ def _analyze_native(data):
         return indexed
     from family4_core import analyze_core
     core = analyze_core(img)
+    if core is None:
+        from family4_encoded import analyze_encoded
+        core = analyze_encoded(img)
     if core is not None:
         return core
     if indexed is not None:
