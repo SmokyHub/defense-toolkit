@@ -772,7 +772,7 @@ def _readonly_selector_copies(img, code):
             break
 
 
-def _copy_reaches_use(code, copy, use):
+def _copy_reaches_use(code, copy, use, nonreturn_calls=()):
     """Require initialization on every CFG path reaching the use, without clobbers."""
     positions = {i.address: k for k, i in enumerate(code)}
     delta = _frame_delta(code)
@@ -790,6 +790,10 @@ def _copy_reaches_use(code, copy, use):
             reached = True
             continue
         i = code[k]
+        # A verified stack-canary failure terminates this path. It cannot
+        # bypass initialization and return to the JNI use being checked.
+        if i.mnemonic == 'bl' and i.operands[0].imm in nonreturn_calls:
+            continue
         if k == copy['index']:
             valid = True
         elif valid:
@@ -825,6 +829,9 @@ def _copied_numeric_selectors(img, code, parser=False):
     copies = list(_readonly_selector_copies(img, code))
     if not copies:
         return
+    from family4_indexed import imports
+    nonreturn_calls = {va for va, name in imports(img).items()
+                       if name in ('__stack_chk_fail', 'abort')}
     delta = _frame_delta(code)
     for k, i in enumerate(code):
         cell = None
@@ -873,7 +880,7 @@ def _copied_numeric_selectors(img, code, parser=False):
         for copy in copies:
             if copy['cell'] != cell or parser and len(copy['value']) != 3:
                 continue
-            if _copy_reaches_use(code, copy, k):
+            if _copy_reaches_use(code, copy, k, nonreturn_calls):
                 yield {key: value for key, value in copy.items() if key not in ('index', 'cell', 'width')} | {
                     'comparison_va' if parser else 'jni_call_va': hex(i.address)}
 

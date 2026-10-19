@@ -5,7 +5,7 @@ from pathlib import Path
 import struct
 
 from family4_native import (Unsupported, ARM64_OP_MEM, _local_argument,
-                            _formatted_numeric_selectors)
+                            _formatted_numeric_selectors, _copied_numeric_selectors)
 from family4_indexed import verify_graph, finish_contract
 from family4_decoder import Decoder
 
@@ -22,7 +22,22 @@ def analyze_core(img):
     if len(candidates)>16:
         return {'family':'family4','status':'needs_review','contracts':[],'strings':[],
                 'diagnostics':['core candidate budget exceeded']}
-    model=json.loads(Path(__file__).with_name('family4_core_models.json').read_text())
+    results=[]
+    for filename in ('family4_core_models.json', 'family4_core_inlined_models.json'):
+        model=json.loads(Path(__file__).with_name(filename).read_text())
+        result=_analyze_core_model(img,candidates,model)
+        if result is not None:
+            result['contract_model']=filename
+            results.append(result)
+    supported=[r for r in results if r['status']=='supported']
+    if len(supported)==1:return supported[0]
+    if len(supported)>1:
+        return {'family':'family4','status':'needs_review','contracts':[],'strings':[],
+                'diagnostics':['ambiguous core instruction models'],'runtime_execution_observed':False}
+    return results[0] if results else None
+
+
+def _analyze_core_model(img,candidates,model):
     results=[];failures=[]
     for start in sorted(candidates):
         try:bound,codes,refs,constants,imported=verify_graph(img,start,model,core=True)
@@ -30,8 +45,13 @@ def analyze_core(img):
         try:
             table=refs[('selectors',model['selector_table_instruction'])]
             outer=struct.unpack('<Q',img.read(table,8))[0]
-            # The same checked decimal formatter must feed JNI NewStringUTF.
+            # A checked formatter or complete read-only C-string copy must
+            # feed JNI NewStringUTF with the table's outer selector.
             triggers=[x for x in _formatted_numeric_selectors(img) if x['value']==str(outer)]
+            if not triggers:
+                triggers=[x for start in img.starts
+                          for x in _copied_numeric_selectors(img,img.function(start))
+                          if x['value']==str(outer)]
             if not triggers:raise Unsupported('core outer selector lacks a verified JNI trigger')
             decoder=Decoder(img,bound['decoder'],imported)
             rows={};required={}
