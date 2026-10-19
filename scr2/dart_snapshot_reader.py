@@ -517,7 +517,8 @@ def export(refs, roots, dispatch, stubs):
         return 'Obj!' + clsname(o['cid']) if o['cid'] >= len(names) else n
     poolobj = refs[roots['global_object_pool']]
     pool = {}
-    meta = {'fields': {}, 'objects': {}, 'dispatch': dispatch, 'stubs': stubs, 'builtins': {'string': 94, 'list': 92, 'uint8': 116}}
+    meta = {'fields': {}, 'objects': {}, 'cached_arrays': {}, 'dispatch': dispatch, 'stubs': stubs,
+            'builtins': {'string': 94, 'list': 92, 'uint8': 116}}
     sum_length = [0]
     for i, (kind, value) in enumerate(poolobj['entries']):
         off = 16 + i * 8
@@ -526,6 +527,10 @@ def export(refs, roots, dispatch, stubs):
             require(o['cid'] >= 0, 'unmodeled base object in global pool')
             pool[off] = render(value)
             meta['objects'][off] = o['cid']
+            if o['name'] == 'CachedArray':
+                # VM-defined descriptors share a CID but differ in argument
+                # counts/shape. Preserve their base-root identity for consumers.
+                meta['cached_arrays'][off] = value
             if o['name'] == 'Field':
                 f = refs[o['refs'][3]]
                 meta['fields'][off] = {'slot': refs[o['slot']]['value'] * 4, 'static': bool(o['flags'] & 2), 'initializer': f.get('entry', 0)}

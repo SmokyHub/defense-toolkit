@@ -24,7 +24,7 @@ import subprocess
 import zipfile
 from collections import defaultdict
 from pathlib import Path, PurePosixPath
-from dex_response_proof import build_proof, ProofUnavailable
+from dex_response_proof import build_proof, ProofUnavailable, encode_envelopes
 
 FORMAT = 'apk-defense.dex-response/v1'
 PLACEHOLDER = 'DEX ARRAY'
@@ -458,9 +458,29 @@ def render(profile, keys, contract):
 
     template_schema = {'$schema': SCHEMA_URI, 'title': 'Analysis placeholder template', **schema(template, [], False)}
     response_schema = {'$schema': SCHEMA_URI, 'title': 'Compatible test response after DEX substitution', **schema(template, [], True)}
-    return {'template': template, 'template_schema': template_schema, 'response_schema': response_schema,
+    result = {'template': template, 'template_schema': template_schema, 'response_schema': response_schema,
             'fields': fields, 'dex_paths': dex_paths, 'fixed_calls': profile.get('fixed_calls', []),
             'dex_encodings': [{'path': list(path), 'encoding': encoding} for path, encoding in dex_encodings.items()]}
+    transforms = profile.get('response_transforms', [])
+    if transforms:
+        try:
+            result['template'] = encode_envelopes(template, transforms)
+        except ProofUnavailable as error:
+            raise AnalysisError(str(error)) from error
+        result['decoded_template'] = template
+        result['response_transforms'] = transforms
+        result['decoded_response_schema'] = response_schema
+        result['template_schema'] = {'$schema': SCHEMA_URI, 'title': 'Encoded analysis placeholder template',
+                                     **schema(result['template'], [], False)}
+        # Chunk concatenation and decoded object validation need a second pass;
+        # JSON Schema alone cannot express that cross-element transformation.
+        key = transforms[0]['path'][0]
+        result['response_schema'] = {'$schema': SCHEMA_URI, 'type': 'object', 'required': [key],
+            'properties': {key: {'type': 'array', 'minItems': 1,
+                'items': {'type': 'string', 'pattern': '^[A-Za-z0-9+/=]*$'},
+                'description': 'Join fragments, Base64 decode, UTF-8 decode, then parse JSON. Decoded schema is separate.'}},
+            'x-decoded-response-schema': response_schema}
+    return result
 
 
 SIGNALS = {

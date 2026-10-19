@@ -620,7 +620,19 @@ def discover(data, pool, bridge=None, metadata=None):
             candidate['limitations'] = finding['evidence']['assumptions']
         except Unresolved as error:
             candidate['contract_diagnostic'] = str(error)
+    # A separately reviewed compiled graph covers packed Base64/JSON envelopes.
+    # It does not reinterpret unresolved generic calls as collection identities.
+    from flutter_packed import discover as discover_packed
+    packed, packed_diagnostics = discover_packed(program, [int(f, 16) for f in groups],
+                                                 jni_table(bridge) if bridge else {}, origin)
+    findings.extend(packed)
+    for finding in packed:
+        candidates.append({'function': finding['evidence']['function'],
+                           'boundary': 'base64_utf8_json_fragments',
+                           'status': 'conditional_contract_recovered',
+                           'limitations': finding['evidence']['assumptions']})
     return {'findings': findings, 'candidates': candidates,
+            'packed_diagnostics': packed_diagnostics,
             'preferences_diagnostics': preferences['diagnostics'],
             'coverage_limits': {'numeric_candidate_limit_reached': program.numeric_limit_reached,
                                 'literal_group_limit_reached': literal_groups >= MAX_CANDIDATES,
@@ -705,6 +717,25 @@ def analyze_input(libapp, bridge=None, directory=None, executable=None, reader='
             stages[-1]['status'] = 'not_supplied'
         begin('consumer_contract')
         result = discover(data, pool, bridge_data, metadata)
+        # Native metadata can omit cached descriptors needed by a conservative
+        # graph model even when snapshot loading succeeds. Auto mode may retry
+        # the independently checked Python snapshot schema, without relaxing
+        # consumer checks or changing explicit native-only behavior.
+        if reader == 'auto' and analyzer.get('reader') == 'blutter' and not result['findings']:
+            from dart_snapshot_reader import supports
+            if supports(identity):
+                native_diagnostics = result.get('diagnostics', [])
+                try:
+                    pp, alternate, mm = load_snapshot(libapp, data, identity, reader='python')
+                    recovered = discover(data, pp, bridge_data, mm)
+                    if recovered['findings']:
+                        result = recovered
+                        analyzer = alternate
+                        analyzer['native_consumer_diagnostic'] = native_diagnostics
+                    else:
+                        result['python_consumer_diagnostics'] = recovered.get('diagnostics', [])
+                except (OSError, ValueError, ELFError) as error:
+                    result['python_consumer_diagnostics'] = [str(error)]
         stages[-1]['status'] = 'conditional_contract_recovered' if result['findings'] else 'needs_review'
     except (OSError, ValueError, ELFError, subprocess.TimeoutExpired) as error:
         stages[-1].update(status='failed', diagnostic=str(error))
