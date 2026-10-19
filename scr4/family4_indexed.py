@@ -303,7 +303,8 @@ def verify_graph(img, root, model, *, core=False):
                 raise Unsupported('changed byte-switch destinations')
         observed = shape(code,replacements,skip_padding=core)
         if core:
-            observed = _canonical_shape(observed, list(range(len(code))))
+            observed = _canonical_shape(observed, list(range(len(code))),
+                                        max_instructions=model.get('max_function_instructions',1024))
         if observed is None or hashlib.sha256(observed.encode()).hexdigest() != spec['shape_sha256']:
             raise Unsupported('changed indexed instruction graph: ' + name)
     # Check immutable SIMD/scalar parser limits referenced through ADRP pages.

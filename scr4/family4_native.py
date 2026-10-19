@@ -409,7 +409,7 @@ def _shape(insns):
     return '\n'.join(rows)
 
 
-def _canonical_shape(shape, offsets=None):
+def _canonical_shape(shape, offsets=None, *, max_instructions=1024):
     """Normalize padding and bijective scratch-register allocation only.
 
     Preserve ABI inputs/outputs (including x8), callee-saved registers, widths,
@@ -420,7 +420,8 @@ def _canonical_shape(shape, offsets=None):
         return None
     rows = shape.splitlines()
     offsets = list(offsets) if offsets is not None else list(range(0, 4 * len(rows), 4))
-    if not rows or len(rows) > 1024 or len(offsets) != len(rows) or len(set(offsets)) != len(rows):
+    if (not 1 <= max_instructions <= 4096 or not rows or len(rows) > max_instructions
+            or len(offsets) != len(rows) or len(set(offsets)) != len(rows)):
         return None
     kept = [k for k, row in enumerate(rows) if row.split(' ', 1)[0] not in ('nop', 'bti')]
     if not kept:

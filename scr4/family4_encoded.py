@@ -16,39 +16,61 @@ from family4_indexed import verify_graph, shape
 from family4_decoder import Decoder
 
 MODEL = 'family4_encoded_models.json'
+MODELS = (MODEL, 'family4_encoded_split_models.json')
+DEFAULT_TRIGGER = {'before':24, 'after':72, 'calls':{'6':'selector_value','12':'formatter'},
+                   'failures':[7,18], 'formatter_instruction':12}
 
 
-def trigger_shape(img, call, bound):
+def trigger_shape(img, call, bound, layout=None):
     """Check the reviewed successful path from selector(0) to NewStringUTF.
 
     Failure exits leave this slice; the result is conditional path evidence,
     not a claim that startup or any of these branches ran.
     """
-    start, end = call.address-24, call.address+72
+    layout=DEFAULT_TRIGGER if layout is None else layout
+    start, end = call.address-layout['before'], call.address+layout['after']
+    if not 0<=layout['before']<=128 or not 0<=layout['after']<=128:
+        raise Unsupported('encoded trigger slice exceeds bounds')
     code = Code(img.byaddr[a] for a in range(start,end+4,4) if a in img.byaddr)
-    if len(code)!=25:raise Unsupported('incomplete encoded outer-trigger slice')
+    if len(code)!=(end-start)//4+1:raise Unsupported('incomplete encoded outer-trigger slice')
     replacements={}
     for k,ins in enumerate(code):
         if ins.mnemonic=='bl':
-            name={6:'selector_value',12:'formatter'}.get(k)
+            name=layout['calls'].get(str(k))
             if name is None or ins.operands[0].imm!=bound[name]:
                 raise Unsupported('changed encoded trigger helper')
             replacements[k]='bl function:'+name
         elif ins.mnemonic=='tbz':
-            if k not in (7,18) or start<=ins.operands[-1].imm<=end:
+            if k not in layout['failures'] or start<=ins.operands[-1].imm<=end:
                 raise Unsupported('changed encoded trigger failure exit')
             replacements[k]=ins.mnemonic+' '+ins.op_str.rsplit(', ',1)[0]+', <failure>'
     return shape(code,replacements),code
 
 
-def selectors(img, refs, spec):
+def selector_parameters(codes, model):
+    """Read reviewed scalar sites after graph verification; never skip guards."""
+    if 'selector_parameters' not in model:
+        return {'mapping_mask':0xd4, 'low_rotation':14, 'high_rotation':26}
+    result={}
+    for name,site in model['selector_parameters'].items():
+        op=codes[site['function']][site['instruction']].operands[site['operand']]
+        result[name]=op.shift.value if site.get('shift') else op.imm
+    if (set(result)!={'mapping_mask','low_rotation','high_rotation'}
+            or not 0<=result['mapping_mask']<=0xffffffff
+            or not all(1<=result[k]<=31 for k in ('low_rotation','high_rotation'))):
+        raise Unsupported('unmodeled encrypted selector parameters')
+    return result
+
+
+def selectors(img, refs, spec, parameters=None):
+    parameters=selector_parameters({}, {}) if parameters is None else parameters
     addresses={name:refs[tuple(site)] for name,site in spec.items()}
     sizes={'mapping':64,'xor':128,'add':128,'cipher':128}
     for name,address in addresses.items():
         if not any(not s['p_flags']&2 and s['p_vaddr']<=address and
                    address+sizes[name]<=s['p_vaddr']+s['p_filesz'] for s in img.loads):
             raise Unsupported('encoded selector table is not read-only')
-    mapping=[x^0xd4 for x in struct.unpack('<16I',img.read(addresses['mapping'],64))]
+    mapping=[x^parameters['mapping_mask'] for x in struct.unpack('<16I',img.read(addresses['mapping'],64))]
     if sorted(mapping)!=list(range(16)):
         raise Unsupported('encoded selector mapping is not a permutation')
     tables={name:struct.unpack('<32I',img.read(addresses[name],128)) for name in ('xor','add','cipher')}
@@ -56,8 +78,8 @@ def selectors(img, refs, spec):
     keys=[]
     for index in mapping:
         low,high=2*index,2*index+1
-        lo=((tables['xor'][low]^ror(tables['cipher'][low],14))-tables['add'][low])&0xffffffff
-        hi=((ror(tables['cipher'][high],26)-tables['add'][high])&0xffffffff)^tables['xor'][high]
+        lo=((tables['xor'][low]^ror(tables['cipher'][low],parameters['low_rotation']))-tables['add'][low])&0xffffffff
+        hi=((ror(tables['cipher'][high],parameters['high_rotation'])-tables['add'][high])&0xffffffff)^tables['xor'][high]
         keys.append(lo|(hi<<32))
     # Same nonnegative decimal domain as the proof generator and prior readers.
     if len(set(keys[1:]))!=15 or not all(0<=k<10**12 for k in keys):
@@ -119,20 +141,45 @@ def analyze_encoded(img):
             if at>=0:candidates.add(img.starts[at])
     if not candidates:return None
     if len(candidates)>16:return None
-    model=json.loads(Path(__file__).with_name(MODEL).read_text());results=[];failures=[]
+    results=[]
+    for filename in MODELS:
+        model=json.loads(Path(__file__).with_name(filename).read_text())
+        result=_analyze_model(img,candidates,model,filename)
+        if result is not None:results.append(result)
+    supported=[r for r in results if r['status']=='supported']
+    if len(supported)==1:return supported[0]
+    if len(supported)>1:
+        return {'family':'family4','status':'needs_review','contracts':[],'strings':[],
+                'diagnostics':['ambiguous encrypted core models'],'runtime_execution_observed':False}
+    return results[0] if results else None
+
+
+def _analyze_model(img,candidates,model,filename):
+    results=[];failures=[]
     for start in sorted(candidates):
         try:bound,codes,refs,constants,imported=verify_graph(img,start,model,core=True)
         except (Unsupported,KeyError,IndexError):continue
         try:
-            keys,addresses=selectors(img,refs,model['selector_arrays'])
+            parameters=selector_parameters(codes,model)
+            keys,addresses=selectors(img,refs,model['selector_arrays'],parameters)
             triggers=[]
+            layout=model.get('trigger_layout',DEFAULT_TRIGGER)
             for ins in img.ins:
                 if ins.mnemonic!='bl' or ins.operands[0].imm!=bound['selector_value']:continue
-                try:observed,code=trigger_shape(img,ins,bound)
-                except (Unsupported,KeyError):continue
+                try:
+                    trigger_bound=dict(bound)
+                    if 'trigger_formatter_model' in model:
+                        site=ins.address-layout['before']+layout['formatter_instruction']*4
+                        call=img.byaddr[site]
+                        if call.mnemonic!='bl':continue
+                        target=call.operands[0].imm
+                        verify_graph(img,target,model['trigger_formatter_model'],core=True)
+                        trigger_bound['formatter']=target
+                    observed,code=trigger_shape(img,ins,trigger_bound,layout)
+                except (Unsupported,KeyError,IndexError):continue
                 if hashlib.sha256(observed.encode()).hexdigest()==model['trigger_sha256']:
                     triggers.append({'value':str(keys[0]),'selector_source':'verified_encrypted_selector_zero',
-                                     'selector_call_va':hex(ins.address),'format_call_va':hex(code[12].address),
+                                     'selector_call_va':hex(ins.address),'format_call_va':hex(code[layout['formatter_instruction']].address),
                                      'jni_call_va':hex(code[-1].address),
                                      'scope':'Conditional successful instruction path; startup reachability is not established.'})
             if len(triggers)!=1:raise Unsupported('missing or ambiguous encrypted selector trigger')
@@ -163,11 +210,12 @@ def analyze_encoded(img):
                           'dex_versions':['035','037','038','039','040','041'],'exact_file_size':True,
                           'header_and_table_bounds':True,'dex_checksum_checked_by_native':False},
                 'additional_checks':'Verified JSON preflight, indirect field roles, descriptor syntax, allocation budgets and JNI types.'}
-            results.append({'family':'family4','variant':'encrypted_selector_core','contract_model':MODEL,
+            results.append({'family':'family4','variant':'encrypted_selector_core','contract_model':filename,
                 'status':'supported','sha256':hashlib.sha256(img.data).hexdigest(),'endpoint':next(iter(endpoints)),
                 'http_method':'POST','strings':rows,'contracts':[contract],'diagnostics':[],
                 'evidence_level':'verified_native_contract_and_isolated_decoder_calls','runtime_execution_observed':False,
                 'endpoint_evidence':'Decoded constant-ID call; surrounding network path is not verified.',
+                'selector_transform':parameters,
                 'limitations':['Conditional verified loader and outer-selector path; startup and network reachability are not established.',
                                'Role-map changes and unknown parser/loader layouts require review.',
                                'Bounded isolated decoder execution is not app or DEX runtime execution.']})
