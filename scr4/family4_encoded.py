@@ -192,7 +192,22 @@ def analyze_encoded(img):
     if len(supported)>1:
         return {'family':'family4','status':'needs_review','contracts':[],'strings':[],
                 'diagnostics':['ambiguous encrypted core models'],'runtime_execution_observed':False}
-    return results[0] if results else None
+    # A recognized graph with rejected data is a validation failure, not a new
+    # compiler layout. Do not reinterpret it through a more permissive path.
+    if results:return results[0]
+    # Separate finite numeric helpers from the checked parser/loader skeleton.
+    # Run this only after all exact models fail, so existing evidence is stable.
+    flexible=[]
+    for filename in MODELS:
+        model=json.loads(Path(__file__).with_name(filename).read_text())
+        result=_analyze_model(img,candidates,model,filename,finite=True)
+        if result is not None:flexible.append(result)
+    supported=[r for r in flexible if r['status']=='supported']
+    if len(supported)==1:return supported[0]
+    if len(supported)>1:
+        return {'family':'family4','status':'needs_review','contracts':[],'strings':[],
+                'diagnostics':['ambiguous finite-domain core models'],'runtime_execution_observed':False}
+    return flexible[0] if flexible else results[0] if results else None
 
 
 def role_slot(codes, bound, item):
@@ -217,14 +232,24 @@ def role_slot(codes, bound, item):
     return _jni_slot(expanded,at+len(helper)-2)
 
 
-def _analyze_model(img,candidates,model,filename):
+def _analyze_model(img,candidates,model,filename,*,finite=False):
     results=[];failures=[]
+    verification=model
+    if finite:
+        verification={**model,'isolated_decoders':[*model['isolated_decoders'],
+            'selector_value','role_mapper','role_order']}
     for start in sorted(candidates):
-        try:bound,codes,refs,constants,imported=verify_graph(img,start,model,core=True)
+        try:bound,codes,refs,constants,imported=verify_graph(img,start,verification,core=True)
         except (Unsupported,KeyError,IndexError):continue
         try:
-            parameters=selector_parameters(codes,model)
-            keys,addresses=selectors(img,refs,model['selector_arrays'],parameters)
+            finite_evidence=None
+            if finite:
+                from family4_scalar import recover_selectors
+                keys,finite_evidence=recover_selectors(img,bound,imported)
+                parameters={'mode':'finite_domain_integer_interpreter'};addresses={}
+            else:
+                parameters=selector_parameters(codes,model)
+                keys,addresses=selectors(img,refs,model['selector_arrays'],parameters)
             triggers=[]
             layout=model.get('trigger_layout',DEFAULT_TRIGGER)
             for ins in img.ins:
@@ -255,7 +280,8 @@ def _analyze_model(img,candidates,model,filename):
                     raise Unsupported('changed encoded-core JNI role call')
                 evidence.append({'jni_slot':hex(item['slot']),'name_key':str(keys[item['name_index']]),
                                  'signature_key':str(keys[item['signature_index']]),'call_va':hex(ins.address),
-                                 'binding':'Reviewed loader graph and checked role-map table.'})
+                                 'binding':('Reviewed loader graph and exhaustive pure role mapping.' if finite
+                                            else 'Reviewed loader graph and checked role-map table.')})
             rows=recover_strings(img,model,bound,codes,constants,imported)
             endpoints={r['text'] for r in rows if re.fullmatch(r'https?://[^\s]+',r['text'])}
             values={r['text'] for r in rows}
@@ -273,15 +299,23 @@ def _analyze_model(img,candidates,model,filename):
                           'dex_versions':['035','037','038','039','040','041'],'exact_file_size':True,
                           'header_and_table_bounds':True,'dex_checksum_checked_by_native':False},
                 'additional_checks':'Verified JSON preflight, indirect field roles, descriptor syntax, allocation budgets and JNI types.'}
-            results.append({'family':'family4','variant':'encrypted_selector_core','contract_model':filename,
+            result={'family':'family4','variant':'finite_domain_selector_core' if finite else 'encrypted_selector_core','contract_model':filename,
                 'status':'supported','sha256':hashlib.sha256(img.data).hexdigest(),'endpoint':next(iter(endpoints)),
                 'http_method':'POST','strings':rows,'contracts':[contract],'diagnostics':[],
                 'evidence_level':'verified_native_contract_and_isolated_decoder_calls','runtime_execution_observed':False,
                 'endpoint_evidence':'Decoded constant-ID call; surrounding network path is not verified.',
                 'selector_transform':parameters,
                 'limitations':['Conditional verified loader and outer-selector path; startup and network reachability are not established.',
-                               'Role-map changes and unknown parser/loader layouts require review.',
-                               'Bounded isolated decoder execution is not app or DEX runtime execution.']})
+                               'Unknown parser/loader layouts require review; finite helpers must satisfy their verified caller domains.',
+                               'Bounded isolated decoder execution is not app or DEX runtime execution.']}
+            if finite:
+                result['finite_domain_evidence']=finite_evidence
+                result['analysis_stages']=[
+                    {'stage':'verified_parser_loader_graph','status':'observed','candidate_count':len(codes)},
+                    {'stage':'exhaustive_numeric_helpers','status':'observed','candidate_count':sum(len(v['calls']) for v in finite_evidence.values())},
+                    {'stage':'outer_trigger','status':'observed','candidate_count':len(triggers)}]
+                result['limitations'].append('Finite helper evidence covers only the indices used by the verified caller; unknown instructions or dependencies fail closed.')
+            results.append(result)
         except (Unsupported,ValueError,struct.error) as error:failures.append(str(error))
     if len(results)==1:return results[0]
     if results or failures:

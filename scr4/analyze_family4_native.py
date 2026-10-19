@@ -16,6 +16,7 @@ import zipfile
 
 from family4_native import analyze_native
 from dex_response_proof import fixture_bytes, FIXTURE_SHA256, FIXTURE_CONTRACT
+from family4_response import FORMATS, prepare as prepare_response
 
 ARCHIVES = {'.apk', '.apks', '.xapk', '.apkm', '.zip'}
 MAX_LIB = 32 * 1024 * 1024
@@ -124,15 +125,18 @@ def analyze(inputs):
         supported = [r for r in results if r.get('status') == 'supported']
         return {'format': 'apk-defense.family4/v1',
                 'status': 'supported' if len(supported) == 1 else 'needs_review',
+                'status_scope': 'native_loader_contract',
+                'wire_response': {'basis': 'unverified', 'consumer_verified': False},
                 'engine': 'offline Python ELF/string-decoder/JNI argument analysis',
                 'results': results, 'skipped_inputs': skipped,
                 'diagnostics': [] if len(supported) == 1 else ['Exactly one distinct supported ARM64 loader is required for a proof response.'],
                 'proof_of_behavior': None,
                 'limitations': ['Static capability and conditional test contract; not proof of runtime execution or malicious intent.',
-                                'Only the recognized ARM64 loader/validator topology is supported; unknown variants remain needs_review.']}
+                                'Only the recognized ARM64 loader/validator topology is supported; unknown variants remain needs_review.',
+                                'Native support does not establish the HTTP response encoding. Outer Java/Dart/native wrappers are not automatically traced.']}
 
 
-def make_proof(result):
+def make_proof(result, *, response_format=None, response_example=None):
     matches = [r for r in result['results'] if r.get('status') == 'supported']
     if result['status'] != 'supported' or len(matches) != 1:
         raise ValueError('Proof response requires exactly one distinct supported ARM64 loader.')
@@ -158,13 +162,15 @@ def make_proof(result):
     if dex[:4] != b'dex\n' or dex[4:7].decode('ascii') not in guards['dex_versions'] or struct.unpack_from('<I', dex, 32)[0] != len(dex):
         raise ValueError('Benign fixture does not satisfy the recovered DEX header checks.')
     fields = {roles[name]: value for name, value in ROLES.items()}; fields[array] = list(dex)
+    response, wire_evidence, transforms = prepare_response(
+        {outer: fields}, contract, response_format=response_format, response_example=response_example)
     return {'status': 'generated_for_conditional_test_contract', 'runtime_validated_this_run': False,
             'loader_source': match['source'], 'endpoint': match.get('endpoint'), 'method': match.get('http_method'),
             'outer_key': outer, 'array_key': array, 'dex_bytes': len(dex), 'dex_sha256': FIXTURE_SHA256,
             'dex_guards': guards, 'payload_contract': FIXTURE_CONTRACT,
             'expected_markers': ['ENTRY_CALLED', 'UI_INSTALLED', 'BUTTON_EXECUTED'],
             'behavior': 'Local proof screen and working button; the entry makes no network request.',
-            'response': {outer: fields},
+            'response': response, 'wire_response': wire_evidence, 'response_transforms': transforms,
             'limitation': 'The app must accept the response and reach this loader. Newly analyzed inputs need separate runtime validation.'}
 
 
@@ -173,8 +179,15 @@ def main(argv=None):
     parser.add_argument('inputs', nargs='+', type=Path, help='original APK, split directory/ZIP, or extracted ARM64 .so')
     parser.add_argument('--out', type=Path, help='new analysis JSON file; defaults to stdout')
     parser.add_argument('--proof-response', type=Path, help='new response JSON containing the bundled benign DEX')
+    wire = parser.add_mutually_exclusive_group()
+    wire.add_argument('--response-format', choices=FORMATS,
+                      help='explicit wire envelope: inner wraps the outer-key value; body wraps the whole JSON object. Requires --proof-response.')
+    wire.add_argument('--response-example', type=Path,
+                      help='infer the envelope from a local saved response JSON matching the recovered native contract. Requires --proof-response.')
     args = parser.parse_args(argv)
     try:
+        if (args.response_format is not None or args.response_example is not None) and args.proof_response is None:
+            raise ValueError('Response format/example requires --proof-response.')
         outputs = [p.resolve() for p in (args.out, args.proof_response) if p is not None]
         if len(outputs) != len(set(outputs)):
             raise ValueError('--out and --proof-response must be different files.')
@@ -184,10 +197,15 @@ def main(argv=None):
         proof_error = None
         if args.proof_response:
             try:
-                proof = make_proof(result)
-            except ValueError as error:
+                proof = make_proof(result, response_format=args.response_format, response_example=args.response_example)
+            except (OSError, ValueError) as error:
                 # Preserve diagnostics for manual review, even when a requested proof cannot be made.
                 proof_error = str(error)
+                result['native_status'] = result['status']
+                result['status'] = 'needs_review'
+                result['status_scope'] = 'requested_proof_response'
+                result['wire_response'] = {'basis': 'unresolved', 'consumer_verified': False,
+                                           'diagnostics': [proof_error]}
                 result['diagnostics'].append(proof_error)
             else:
                 args.proof_response.parent.mkdir(parents=True, exist_ok=True)
@@ -196,12 +214,14 @@ def main(argv=None):
                     f.write(encoded)
                 proof.update(response_file=str(args.proof_response), response_sha256=hashlib.sha256(encoded).hexdigest())
                 result['proof_of_behavior'] = proof
+                result['wire_response'] = proof['wire_response']
         if args.out:
             args.out.parent.mkdir(parents=True, exist_ok=True)
             with args.out.open('x') as f:
                 json.dump(result, f, indent=2); f.write('\n')
             print(json.dumps({'status': result['status'], 'analysis': str(args.out),
                               'proof_response': str(args.proof_response) if result['proof_of_behavior'] else None,
+                              'wire_response': result.get('wire_response'),
                               'diagnostics': result['diagnostics']}))
         else:
             print(json.dumps(result, indent=2))
