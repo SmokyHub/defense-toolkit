@@ -2,6 +2,7 @@
 import base64
 import copy
 import hashlib
+import json
 from pathlib import Path
 
 FIXTURE_SHA256 = '8de5fb444a932ad2eb5af51fb1082f4cf6d293441808f37ab84e546e936017d0'
@@ -15,6 +16,23 @@ FIXTURE_CONTRACT = {
 
 class ProofUnavailable(ValueError):
     pass
+
+
+def encode_envelopes(response, transforms):
+    """Serialize reviewed logical objects as joined Base64 JSON fragments."""
+    result = copy.deepcopy(response)
+    if len(transforms) > 1:
+        raise ProofUnavailable('Multiple response envelopes are not supported.')
+    for transform in transforms:
+        path = transform.get('path')
+        if (transform.get('encoding') != 'base64_utf8_json_fragments' or
+                not isinstance(path, list) or len(path) != 1 or not isinstance(path[0], str)):
+            raise ProofUnavailable('Unsupported response envelope.')
+        if not isinstance(result, dict) or not isinstance(result.get(path[0]), dict):
+            raise ProofUnavailable('Response envelope must contain a JSON object.')
+        text = json.dumps(result[path[0]], ensure_ascii=True, separators=(',', ':'), allow_nan=False)
+        result[path[0]] = [base64.b64encode(text.encode('utf-8')).decode('ascii')]
+    return result
 
 
 def fixture_bytes():
@@ -43,7 +61,7 @@ def build_proof(rendered, contract):
         if role in FIXTURE_CONTRACT and call.get('value') != FIXTURE_CONTRACT[role]:
             raise ProofUnavailable('App-owned call conflicts with the benign proof DEX: ' + role)
     data = fixture_bytes()
-    response = copy.deepcopy(rendered['template'])
+    response = copy.deepcopy(rendered.get('decoded_template', rendered['template']))
     paths = rendered['dex_paths']
     encodings = rendered['dex_encodings']
     if not paths or len({tuple(e['path']) for e in encodings}) != len(encodings):
@@ -71,10 +89,14 @@ def build_proof(rendered, contract):
             node[path[-1]] = value
         except (KeyError, IndexError, TypeError) as error:
             raise ProofUnavailable('Recovered DEX binding path is invalid.') from error
+    transforms = rendered.get('response_transforms', [])
+    if transforms:
+        response = encode_envelopes(response, transforms)
     return response, {'status': 'generated_for_conditional_test_contract',
                       'runtime_validated_this_run': False,
                       'dex_sha256': FIXTURE_SHA256, 'dex_size': len(data),
                       'payload_contract': FIXTURE_CONTRACT,
                       'dex_encodings': copy.deepcopy(encodings),
+                      **({'response_transforms': copy.deepcopy(transforms)} if transforms else {}),
                       'behavior': 'Local proof screen and button; the bundled entry makes no network request.',
                       'limitation': 'Generated test input; execution and behavior change require separate runtime validation.'}

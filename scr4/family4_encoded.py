@@ -16,7 +16,8 @@ from family4_indexed import verify_graph, shape
 from family4_decoder import Decoder
 
 MODEL = 'family4_encoded_models.json'
-MODELS = (MODEL, 'family4_encoded_split_models.json', 'family4_encoded_records_models.json')
+MODELS = (MODEL, 'family4_encoded_split_models.json', 'family4_encoded_records_models.json',
+          'family4_encoded_parallel_models.json')
 DEFAULT_TRIGGER = {'before':24, 'after':72, 'calls':{'6':'selector_value','12':'formatter'},
                    'failures':[7,18], 'formatter_instruction':12}
 
@@ -194,6 +195,28 @@ def analyze_encoded(img):
     return results[0] if results else None
 
 
+def role_slot(codes, bound, item):
+    """Resolve a slot after expanding one graph-verified argument helper.
+
+    Some outlined helpers load the JNIEnv table and marshal arguments using
+    their caller's saved registers. Expansion is limited to the named call and
+    a short straight-line body; the existing slot provenance check still applies.
+    Callers must verify the complete model graph before using this function.
+    """
+    code=codes['loader'];at=item['instruction']
+    if 'argument_helper' not in item:return _jni_slot(code,at)
+    name=item['argument_helper'];site=item['argument_call_instruction']
+    helper=codes[name]
+    if (not 0<=site<at or at-site>8 or not 2<=len(helper)<=8
+            or code[site].mnemonic!='bl' or code[site].operands[0].imm!=bound[name]
+            or helper[-1].mnemonic!='ret' or helper[-1].op_str
+            or any(i.mnemonic.startswith('b') or i.mnemonic in ('ret','cbz','cbnz','tbz','tbnz')
+                   for i in helper[:-1])):
+        raise Unsupported('unmodeled outlined JNI argument helper')
+    expanded=Code([*code[:site],*helper[:-1],*code[site+1:]])
+    return _jni_slot(expanded,at+len(helper)-2)
+
+
 def _analyze_model(img,candidates,model,filename):
     results=[];failures=[]
     for start in sorted(candidates):
@@ -228,7 +251,7 @@ def _analyze_model(img,candidates,model,filename):
             evidence=[]
             for item in model['jni_roles']:
                 ins=codes['loader'][item['instruction']]
-                if _jni_slot(codes['loader'],item['instruction'])!=item['slot']:
+                if role_slot(codes,bound,item)!=item['slot']:
                     raise Unsupported('changed encoded-core JNI role call')
                 evidence.append({'jni_slot':hex(item['slot']),'name_key':str(keys[item['name_index']]),
                                  'signature_key':str(keys[item['signature_index']]),'call_va':hex(ins.address),
