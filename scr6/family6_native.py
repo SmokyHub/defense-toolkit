@@ -8,6 +8,8 @@ from capstone.arm64 import ARM64_OP_IMM, ARM64_OP_MEM, ARM64_OP_REG
 from family6_elf import Image, Unsupported, ArgumentSlice
 from classloader_report import location, unresolved
 
+MODELS = ('family6_models.json', 'family6_glide_models.json')
+
 def import_targets(img):
     slots = {}
     for sec in img.elf.iter_sections():
@@ -100,8 +102,8 @@ def constant(img, code, at, name, depth=0):
     return None
 
 
-def function_models(img):
-    models = json.loads(Path(__file__).with_name('family6_models.json').read_text())
+def function_models(img, filename='family6_models.json'):
+    models = json.loads(Path(__file__).with_name(filename).read_text())
     imports = import_targets(img)
     expected = {name: value for name, value in models['functions'].items()}
     matches = {name: [] for name in expected}
@@ -282,8 +284,29 @@ def jni_calls(img, start, find_class):
 
 def analyze_native(data):
     img = Image(data)
-    matches, imports = function_models(img)
+    results = [_analyze_model(img, data, filename) for filename in MODELS]
+    supported = [r for r in results if r['status'] == 'native_asset_loader_identified']
+    if len(supported) == 1:
+        return supported[0]
+    # Keep each layout's functions together; never combine partial matches from
+    # different models to manufacture a complete native contract.
+    result = max(results, key=lambda r: sum(bool(v) for v in r['model_matches'].values()))
+    if len(supported) > 1:
+        result = {'family': 'family6', 'status': 'needs_review',
+                  'native_sha256': hashlib.sha256(data).hexdigest(),
+                  'diagnostics': ['ambiguous_reviewed_native_models'],
+                  'runtime_execution_observed': False,
+                  'classloader': unresolved('Multiple complete native layouts matched.')}
+    result['model_attempts'] = [{'model': r['contract_model'], 'status': r['status'],
+                                 'matches': r['model_matches'], 'diagnostics': r['diagnostics']}
+                                for r in results]
+    return result
+
+
+def _analyze_model(img, data, filename):
+    matches, imports = function_models(img, filename)
     result = {'family': 'family6', 'status': 'needs_review', 'diagnostics': [],
+              'contract_model': filename,
               'native_sha256': hashlib.sha256(data).hexdigest(),
               'model_matches': {name: [hex(v) for v in values] for name, values in matches.items()},
               'runtime_execution_observed': False}

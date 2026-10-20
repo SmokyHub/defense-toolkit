@@ -13,7 +13,7 @@ from elftools.common.exceptions import ELFError
 from family6_input import collect
 from family6_native import analyze_native
 from family6_payload import recover_assets
-from classloader_report import render, summaries
+from classloader_report import render, summaries, annotate_library, overview, recovered_strings, render_strings
 
 
 def analyze(inputs):
@@ -22,10 +22,12 @@ def analyze(inputs):
         paths, sources, skipped, assets = collect(inputs, Path(temp))
         for path in paths:
             try:
-                result = analyze_native(Path(path).read_bytes())
+                data = Path(path).read_bytes()
+                result = analyze_native(data)
             except (ValueError, ELFError) as error:
                 result = {'family': 'family6', 'status': 'needs_review', 'diagnostics': [str(error)]}
             result.update(sources[path])
+            annotate_library(result, data)
             results.append(result)
         matches = [r for r in results if r['status'] == 'native_asset_loader_identified']
         recovery = {'status': 'needs_review', 'diagnostics': ['no_unique_supported_native_loader']}
@@ -53,12 +55,16 @@ def main(argv=None):
         if args.out.exists() or args.out.is_symlink():
             raise ValueError('Output must be a new directory: ' + str(args.out))
         report, artifacts = analyze(args.input)
+        report['summary'] = overview(report)
         args.out.mkdir(parents=True, exist_ok=False)
         for name, payload in artifacts.items():
             (args.out / name).write_bytes(payload)
         (args.out / 'analysis.json').write_text(json.dumps(report, indent=2) + '\n')
         (args.out / 'classloaders.txt').write_text(render(report))
+        (args.out / 'recovered_strings.json').write_text(json.dumps(recovered_strings(report), indent=2) + '\n')
+        (args.out / 'recovered_strings.txt').write_text(render_strings(report))
         print(json.dumps({'status': report['status'], 'analysis': str(args.out / 'analysis.json'),
+                          'summary': report['summary'], 'strings_report': str(args.out / 'recovered_strings.txt'),
                           'classloader_report': str(args.out / 'classloaders.txt'), 'classloaders': summaries(report),
                           'recovered_files': [str(args.out / name) for name in artifacts]}))
         return 0 if report['status'] == 'static_asset_dex_recovered' else 2
