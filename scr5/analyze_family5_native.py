@@ -13,20 +13,23 @@ import zipfile
 from elftools.common.exceptions import ELFError
 from family5_input import collect
 from family5_native import analyze_native
-from classloader_report import render, summaries
+from classloader_report import render, summaries, annotate_library, overview, recovered_strings, render_strings
 
 
 def analyze(inputs):
     results, artifacts = [], {}
     with tempfile.TemporaryDirectory(prefix='family5-') as temp:
-        paths, sources, skipped, assets = collect(inputs, Path(temp))
+        identities = []
+        paths, sources, skipped, assets = collect(inputs, Path(temp), identities)
         for path in paths:
             try:
-                result, payloads = analyze_native(Path(path).read_bytes(), assets)
+                data = Path(path).read_bytes()
+                result, payloads = analyze_native(data, assets, identities)
             except (ValueError, ELFError) as error:
                 result, payloads = {'family': 'family5', 'status': 'needs_review',
                                     'diagnostics': [str(error)]}, []
             result.update(sources[path])
+            annotate_library(result, data)
             for payload in payloads:
                 name = 'recovered-' + hashlib.sha256(payload).hexdigest() + '.dex'
                 artifacts[name] = payload
@@ -44,7 +47,7 @@ def analyze(inputs):
             'runtime_execution_observed': False,
             'limitations': [
                 'Static reconstruction only; recovered code is never loaded or executed.',
-                'Class-loading evidence is a native JNI array-field injection structure; encrypted Java API names remain unresolved.',
+                'Class-loading evidence and name resolution are reported per variant; runtime types and execution are not observed.',
                 'DEX integrity checks do not establish ART acceptance, runtime reachability or malicious intent.',
                 'Only reviewed ARM64 helper layouts are supported. Unknown layouts require review.',
             ]}, artifacts
@@ -59,12 +62,16 @@ def main(argv=None):
         if args.out.exists() or args.out.is_symlink():
             raise ValueError('Output must be a new directory: ' + str(args.out))
         report, artifacts = analyze(args.input)
+        report['summary'] = overview(report)
         args.out.mkdir(parents=True, exist_ok=False)
         for name, payload in artifacts.items():
             (args.out / name).write_bytes(payload)
         (args.out / 'analysis.json').write_text(json.dumps(report, indent=2) + '\n')
         (args.out / 'classloaders.txt').write_text(render(report))
+        (args.out / 'recovered_strings.json').write_text(json.dumps(recovered_strings(report), indent=2) + '\n')
+        (args.out / 'recovered_strings.txt').write_text(render_strings(report))
         print(json.dumps({'status': report['status'], 'analysis': str(args.out / 'analysis.json'),
+                          'summary': report['summary'], 'strings_report': str(args.out / 'recovered_strings.txt'),
                           'classloader_report': str(args.out / 'classloaders.txt'), 'classloaders': summaries(report),
                           'recovered_files': [str(args.out / name) for name in artifacts]}))
         return 0 if report['status'] == 'static_asset_dex_recovered' else 2

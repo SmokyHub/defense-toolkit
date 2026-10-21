@@ -1,0 +1,186 @@
+{
+  "format": "apk-defense.family5-resource-model/v1",
+  "review": "reports/family5/com.counterweight.stillbalance.studio/02_native_analysis.md",
+  "blocks": [
+    {
+      "offset": 0,
+      "instructions": 12692,
+      "shape_sha256": "ea56750e9a1ed1b7ae249d106ed48fd9c026c97dcb5fb94b20f3bcfeb58443fd"
+    },
+    {
+      "offset": 125316,
+      "instructions": 97,
+      "shape_sha256": "eaae79a2506854b946aaf97e307077a317a63a3fe8a8f43f4089c76a4480fd99"
+    },
+    {
+      "offset": 126404,
+      "instructions": 77,
+      "shape_sha256": "c27c9744eaf45aaa52e01b20f0a4509f9dd6f9ce40fe6be0e2ca6db49371ae94"
+    }
+  ],
+  "strings": [
+    {
+      "offset": -54984,
+      "bytes": 96,
+      "text": "android/os/Build$VERSION"
+    },
+    {
+      "offset": -53680,
+      "bytes": 164,
+      "text": "(Ljava/lang/String;)Ljavax/crypto/Cipher;"
+    },
+    {
+      "offset": -53516,
+      "bytes": 124,
+      "text": "javax/crypto/spec/SecretKeySpec"
+    },
+    {
+      "offset": -53392,
+      "bytes": 92,
+      "text": "([BLjava/lang/String;)V"
+    },
+    {
+      "offset": -53300,
+      "bytes": 136,
+      "text": "javax/crypto/spec/GCMParameterSpec"
+    },
+    {
+      "offset": -53164,
+      "bytes": 264,
+      "text": "(ILjava/security/Key;Ljava/security/spec/AlgorithmParameterSpec;)V"
+    },
+    {
+      "offset": -53920,
+      "bytes": 152,
+      "text": "(Ljava/lang/String;)Ljavax/crypto/Mac;"
+    },
+    {
+      "offset": -53768,
+      "bytes": 88,
+      "text": "(Ljava/security/Key;)V"
+    },
+    {
+      "offset": -52900,
+      "bytes": 108,
+      "text": "java/security/MessageDigest"
+    },
+    {
+      "offset": -52792,
+      "bytes": 196,
+      "text": "(Ljava/lang/String;)Ljava/security/MessageDigest;"
+    },
+    {
+      "offset": -52596,
+      "bytes": 100,
+      "text": "()Ljava/lang/ClassLoader;"
+    },
+    {
+      "offset": -52496,
+      "bytes": 144,
+      "text": "dalvik/system/InMemoryDexClassLoader"
+    },
+    {
+      "offset": -52160,
+      "bytes": 188,
+      "text": "(Ljava/nio/ByteBuffer;Ljava/lang/ClassLoader;)V"
+    },
+    {
+      "offset": -52352,
+      "bytes": 192,
+      "text": "([Ljava/nio/ByteBuffer;Ljava/lang/ClassLoader;)V"
+    },
+    {
+      "offset": -51972,
+      "bytes": 128,
+      "text": "dalvik/system/BaseDexClassLoader"
+    },
+    {
+      "offset": -51844,
+      "bytes": 100,
+      "text": "dalvik/system/DexPathList"
+    },
+    {
+      "offset": -51744,
+      "bytes": 108,
+      "text": "Ldalvik/system/DexPathList;"
+    },
+    {
+      "offset": -51636,
+      "bytes": 144,
+      "text": "[Ldalvik/system/DexPathList$Element;"
+    },
+    {
+      "offset": -54280,
+      "bytes": 148,
+      "text": "()Landroid/content/pm/PackageManager;"
+    },
+    {
+      "offset": -54132,
+      "bytes": 212,
+      "text": "(Ljava/lang/String;I)Landroid/content/pm/PackageInfo;"
+    },
+    {
+      "offset": -54888,
+      "bytes": 104,
+      "text": "android/app/ActivityThread"
+    },
+    {
+      "offset": -54696,
+      "bytes": 108,
+      "text": "()Landroid/app/Application;"
+    },
+    {
+      "offset": -54784,
+      "bytes": 88,
+      "text": "android/app/AppGlobals"
+    },
+    {
+      "offset": -54588,
+      "bytes": 144,
+      "text": "()Landroid/content/res/AssetManager;"
+    },
+    {
+      "offset": -54444,
+      "bytes": 164,
+      "text": "(Ljava/lang/String;)Ljava/io/InputStream;"
+    },
+    {
+      "offset": -51492,
+      "bytes": 148,
+      "text": "(Ljava/lang/String;)Ljava/lang/Class;"
+    }
+  ],
+  "switch": {
+    "offset": -60720,
+    "bytes": 28,
+    "sha256": "9111002de3c9a2a3b6d1a9aeb21b06a22f8eb009f5b904ed6b6a64526b6a0c47"
+  },
+  "master_key_loads": [
+    {
+      "page": 924,
+      "load": 928
+    },
+    {
+      "page": 932,
+      "load": 948
+    }
+  ],
+  "driver": 744,
+  "asset_name_function": 17212,
+  "item_name_functions": [
+    30864,
+    31060
+  ],
+  "append_byte": 126404,
+  "class_reference": {
+    "storage": -52496,
+    "address_reference": 1512,
+    "decode_call": 1528,
+    "jni_lookup": 1572
+  },
+  "operations": {
+    "NewDirectByteBuffer": 1476,
+    "NewObjectV": 36996,
+    "SetObjectField": 12420
+  }
+}

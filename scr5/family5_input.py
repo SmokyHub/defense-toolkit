@@ -3,12 +3,13 @@ import hashlib
 import io
 from pathlib import Path, PurePosixPath
 import zipfile
+from family5_manifest import identity, MAX_MANIFEST
 
 ARCHIVES = {".apk", ".apks", ".xapk", ".zip", ".apkm"}
 MAX_LIB = 32 * 1024 * 1024
 MAX_TOTAL = 256 * 1024 * 1024
 
-def collect(inputs, temporary):
+def collect(inputs, temporary, identities=None):
     """Stage only bounded ARM64 ELF inputs; never extract archive member paths."""
     files, sources, skipped, hashes = [], {}, [], {}
     assets = []
@@ -48,7 +49,17 @@ def collect(inputs, temporary):
                     continue
                 name = PurePosixPath(entry.filename)
                 child = label + '!' + entry.filename
-                if entry.filename.startswith('assets/') and '..' not in name.parts:
+                if entry.filename == 'AndroidManifest.xml' and identities is not None:
+                    if entry.file_size > MAX_MANIFEST:
+                        raise ValueError('Manifest exceeds 8 MiB bound: ' + child)
+                    total += entry.file_size
+                    if total > MAX_TOTAL or len(identities) >= 10000:
+                        raise ValueError('Manifest input budget exceeded.')
+                    try:
+                        identities.append({**identity(z.read(entry)), 'source': child})
+                    except (ValueError, UnicodeError) as error:
+                        identities.append({'source': child, 'diagnostic': str(error)})
+                elif entry.filename.startswith('assets/') and '..' not in name.parts:
                     if entry.file_size > MAX_LIB:
                         raise ValueError('Asset exceeds 32 MiB bound: ' + child)
                     total += entry.file_size

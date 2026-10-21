@@ -290,8 +290,12 @@ def loader_evidence(img, model):
     return found
 
 
-def analyze_native(data, assets):
+def analyze_native(data, assets, identities=()):
     img = Image(data)
+    from family5_resource import analyze_resource
+    resource = analyze_resource(img, assets, identities)
+    if resource is not None:
+        return resource
     pool = recover_constructor_pool(img)
     result = {'family': 'family5', 'status': 'needs_review',
               'native_sha256': hashlib.sha256(data).hexdigest(), 'constructor_pool': pool,
