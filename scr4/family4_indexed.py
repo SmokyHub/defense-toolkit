@@ -12,6 +12,7 @@ from pathlib import Path
 
 
 def imports(img):
+    from family4_native import ARM64_OP_MEM, ARM64_OP_REG
     slots = {}
     for sec in img.elf.iter_sections():
         if sec['sh_type'] == 'SHT_RELA':
@@ -25,8 +26,16 @@ def imports(img):
         if ins.mnemonic == 'bti':
             body = body[1:]
         if len(body) >= 2 and body[0].mnemonic == 'adrp' and body[1].mnemonic == 'ldr':
-            if body[0].op_str.startswith('x16,') and body[1].op_str.startswith('x17, [x16,'):
-                address = body[0].operands[1].imm + body[1].operands[1].mem.disp
+            load = body[1]
+            if (body[0].op_str.startswith('x16,') and len(load.operands) == 2
+                    and load.operands[0].type == ARM64_OP_REG
+                    and load.reg_name(load.operands[0].reg) == 'x17'
+                    and load.operands[1].type == ARM64_OP_MEM
+                    and load.reg_name(load.operands[1].mem.base) == 'x16'
+                    and not load.operands[1].mem.index and not load.writeback):
+                # Capstone prints a zero displacement as [x16], omitting the
+                # comma/immediate. Read the operand instead of its formatting.
+                address = body[0].operands[1].imm + load.operands[1].mem.disp
                 if address in slots:
                     result[ins.address] = slots[address]
     return result
