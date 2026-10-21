@@ -17,7 +17,8 @@ from family4_decoder import Decoder
 
 MODEL = 'family4_encoded_models.json'
 MODELS = (MODEL, 'family4_encoded_split_models.json', 'family4_encoded_records_models.json',
-          'family4_encoded_parallel_models.json', 'family4_encoded_choice_models.json')
+          'family4_encoded_parallel_models.json', 'family4_encoded_choice_models.json',
+          'family4_encoded_interleaved_models.json')
 DEFAULT_TRIGGER = {'before':24, 'after':72, 'calls':{'6':'selector_value','12':'formatter'},
                    'failures':[7,18], 'formatter_instruction':12}
 
