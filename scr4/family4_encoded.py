@@ -17,7 +17,7 @@ from family4_decoder import Decoder
 
 MODEL = 'family4_encoded_models.json'
 MODELS = (MODEL, 'family4_encoded_split_models.json', 'family4_encoded_records_models.json',
-          'family4_encoded_parallel_models.json')
+          'family4_encoded_parallel_models.json', 'family4_encoded_choice_models.json')
 DEFAULT_TRIGGER = {'before':24, 'after':72, 'calls':{'6':'selector_value','12':'formatter'},
                    'failures':[7,18], 'formatter_instruction':12}
 
@@ -61,8 +61,14 @@ def selector_parameters(codes, model):
         if (set(result)!=chunks|{'mapping_mask'} or not 0<=result['mapping_mask']<=0xff
                 or not all(0<=result[k]<=0xffff for k in chunks)):
             raise Unsupported('unmodeled record selector parameters')
-        return {'kind':'rotating_u64_records', 'mapping_mask':result['mapping_mask'],
-                'rotation_mask':sum(result[f'rotation_mask_{k}']<<(16*k) for k in range(4))}
+        parameters = {'kind':'rotating_u64_records', 'mapping_mask':result['mapping_mask'],
+                      'rotation_mask':sum(result[f'rotation_mask_{k}']<<(16*k) for k in range(4))}
+        if 'record_field_order' in model:
+            order = model['record_field_order']
+            if order != ['xor_a', 'rotation', 'xor_b', 'add', 'cipher']:
+                raise Unsupported('unmodeled record selector field order')
+            parameters['record_field_order'] = order
+        return parameters
     if (set(result)!={'mapping_mask','low_rotation','high_rotation'}
             or not 0<=result['mapping_mask']<=0xffffffff
             or not all(1<=result[k]<=31 for k in ('low_rotation','high_rotation'))):
@@ -118,7 +124,12 @@ def record_selectors(img, refs, spec, parameters):
     records=list(struct.iter_unpack('<5Q',img.read(addresses['records'],640)))
     keys=[];mask=(1<<64)-1
     for index in mapping:
-        a,encoded_rotation,cipher,add,b=records[index]
+        if parameters.get('record_field_order') == ['xor_a', 'rotation', 'xor_b', 'add', 'cipher']:
+            a,encoded_rotation,b,add,cipher=records[index]
+        elif 'record_field_order' not in parameters:
+            a,encoded_rotation,cipher,add,b=records[index]
+        else:
+            raise Unsupported('unmodeled record selector field order')
         rotation=encoded_rotation^parameters['rotation_mask']
         if not 1<=rotation<=63:raise Unsupported('invalid record selector rotation')
         rotated=((cipher>>rotation)|(cipher<<(64-rotation)))&mask
