@@ -9,19 +9,26 @@ from pathlib import Path
 import re
 
 MODEL = 'flutter_packed_models.json'
-MAX_FUNCTIONS = 1024
-MAX_INSTRUCTIONS = 100000
+MODELS = (MODEL, 'flutter_packed_callers_models.json')
+MAX_FUNCTIONS = 2048
+MAX_INSTRUCTIONS = 150000
 
 
 class Unmodeled(ValueError):
     pass
 
 
-def node(program, function, skip=0, parameters=()):
+def node(program, function, skip=0, parameters=(), *, stop=None):
     """Canonicalize addresses as graph edges, preserving instructions and data."""
     addresses = program.functions.get(function, [])
     if not 0 <= skip < len(addresses) or len(addresses) > 12000:
         raise Unmodeled('packed helper bounds')
+    fragment = stop is not None
+    if fragment:
+        if not skip < stop <= len(addresses) or stop-skip > 128:
+            raise Unmodeled('packed caller slice bounds')
+        addresses = addresses[skip:stop]
+        skip = 0
     positions = {a: k for k, a in enumerate(addresses)}
     rows = []; edges = {}; values = {}
     for k, a in enumerate(addresses):
@@ -43,6 +50,13 @@ def node(program, function, skip=0, parameters=()):
             target = int(args.rsplit('#', 1)[1], 0)
             if target in positions:
                 args = args.rsplit('#', 1)[0] + '@' + str(positions[target])
+            elif (fragment and op != 'b' and target > addresses[-1]
+                  and program.owner(target) == function):
+                # This is a conditional successful caller slice. Failure exits
+                # must leave it forwards; never treat a back edge as a failure.
+                args = args.rsplit('#', 1)[0] + '<failure>'
+            elif fragment:
+                raise Unmodeled('unmodeled packed caller exit')
             elif target in program.metadata['stubs']:
                 args = args.rsplit('#', 1)[0] + 'stub:' + program.metadata['stubs'][target]
             elif target in program.functions:
@@ -89,7 +103,7 @@ def node(program, function, skip=0, parameters=()):
             args += ' pool:' + hashlib.sha256((ref + '|cid:' + str(cid)).encode()).hexdigest()
         rows.append(op + ' ' + args)
     last = addresses[-1]
-    if program.code[last][0] not in ('b', 'br', 'ret', 'brk'):
+    if not fragment and program.code[last][0] not in ('b', 'br', 'ret', 'brk'):
         if last + 4 not in program.functions: raise Unmodeled('unresolved helper fallthrough')
         edges['fallthrough'] = last + 4
     return {'instructions': len(rows), 'sha256': hashlib.sha256('\n'.join(rows).encode()).hexdigest()}, edges, values
@@ -123,9 +137,58 @@ def verify(program, root, model):
     return bound, keys
 
 
+def caller_envelopes(program, bound, model):
+    """Bind outer-map reads to a separately verified fragment-consuming loader.
+
+    Every direct caller must match a reviewed successful slice. No outer key is
+    borrowed from an unrelated numeric conversion or inferred from inner keys.
+    """
+    calls = [a for a, (op, args) in program.code.items()
+             if op == 'bl' and int(args[1:], 0) == bound['loader']]
+    if not 1 <= len(calls) <= 16:
+        raise Unmodeled('missing or excessive packed envelope callers')
+    if len(calls) != model['caller_count']:
+        raise Unmodeled('changed packed envelope caller count')
+    results = []
+    for call in calls:
+        function = program.owner(call)
+        addresses = program.functions[function]
+        end = addresses.index(call) + 1
+        matches = []
+        for spec in model['caller_envelopes']:
+            start = end - spec['instructions']
+            if start < 0: continue
+            try:
+                actual, edges, keys = node(program, function, start, [spec['selector']], stop=end)
+            except (Unmodeled, KeyError, IndexError, ValueError):
+                continue
+            if (actual != spec['shape'] or set(edges) != set(spec['edges'])
+                    or any(target != bound[spec['edges'][site]] for site, target in edges.items())):
+                continue
+            matches.append({'outer_key': keys[spec['selector']], 'caller_function': hex(function),
+                            'selector_va': hex(addresses[start+spec['selector']]),
+                            'loader_call_va': hex(call),
+                            'scope': 'Conditional successful caller slice; failure paths and network/cache origin are not established.'})
+        if len(matches) != 1:
+            raise Unmodeled('unmodeled or ambiguous packed envelope caller')
+        results.extend(matches)
+    if len({item['outer_key'] for item in results}) != 1:
+        raise Unmodeled('inconsistent packed outer selectors across callers')
+    return results
+
+
 def discover(program, candidates, bridge_table, origin):
     if not origin: return [], []
-    model = json.loads(Path(__file__).with_name(MODEL).read_text())
+    findings = []; diagnostics = []
+    for filename in MODELS:
+        model = json.loads(Path(__file__).with_name(filename).read_text())
+        matches, failures = _discover_model(program, candidates, bridge_table, origin, model, filename)
+        findings.extend(matches); diagnostics.extend(failures)
+    if len(findings) > 1: return [], [{'diagnostic': 'ambiguous packed consumer graphs'}]
+    return findings, diagnostics
+
+
+def _discover_model(program, candidates, bridge_table, origin, model, filename):
     findings = []; diagnostics = []
     for function in sorted(set(candidates))[:32]:
         try:
@@ -133,7 +196,8 @@ def discover(program, candidates, bridge_table, origin):
             for slot, symbol in model['bridge_slots'].items():
                 if bridge_table.get(int(slot), {}).get('symbol') != symbol:
                     raise Unmodeled('changed packed JNI bridge slot')
-            outer = keys[model['outer_selector']]
+            callers = caller_envelopes(program, bound, model) if 'caller_envelopes' in model else []
+            outer = callers[0]['outer_key'] if callers else keys[model['outer_selector']]
             selected = [keys[b['selector']] for b in model['bindings']]
             if len(set(selected)) != len(selected): raise Unmodeled('colliding packed response keys')
             bindings = []
@@ -146,12 +210,14 @@ def discover(program, candidates, bridge_table, origin):
             findings.append({'bindings': bindings, 'fixed_calls': model['fixed_calls'],
                              'response_transforms': [transform],
                              'evidence': {'kind': 'reviewed_compiled_consumer_graph', 'function': hex(function),
-                                          'model': MODEL, 'review_report': model['review_report'],
+                                          'model': filename, 'review_report': model['review_report'],
                                           'functions_checked': len(bound), 'bridge_origin': origin,
                                           'response_transforms': [transform],
                                           'assumptions': ['Conditional successful path with initialized Context/Activity and JNI bridge.',
                                                           'Standard Dart VM stubs, collection, JSON, UTF-8 and Base64 library semantics.',
                                                           'Exact network/cache provenance and runtime execution are not established.']}})
+            if callers:
+                findings[-1]['evidence']['outer_callers'] = callers
         except (Unmodeled, KeyError, IndexError, ValueError) as error:
             diagnostics.append({'function': hex(function), 'diagnostic': str(error)})
     if len(findings) > 1: return [], [{'diagnostic': 'ambiguous packed consumer graphs'}]
