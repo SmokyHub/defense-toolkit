@@ -1,10 +1,19 @@
 'use strict';
 
 const LOG_PREFIX = '[VM-ASSET-TRACE]';
-// Family-specific routines invoke inferred native functions and synthetic DEX paths.
-// Opt in only for reviewed builds: frida -P '{"legacyProof":true}' ...
+// VM decoding is the default. Java hooks are optional and never required for native tracing.
+// frida -P '{"javaHooks":true}' enables focused Java DCL events.
+// legacyProof separately enables the old bypass/synthetic-execution harness.
+const traceOptions = { decodeVm: true, javaHooks: false };
 let legacyProof = false;
-rpc.exports = { init(stage, parameters) { legacyProof = !!(parameters && parameters.legacyProof); } };
+rpc.exports = { init(stage, parameters) {
+    parameters = parameters || {};
+    legacyProof = parameters.legacyProof === true;
+    if (parameters.decodeVm !== undefined) traceOptions.decodeVm = parameters.decodeVm === true;
+    if (parameters.javaHooks !== undefined) traceOptions.javaHooks = parameters.javaHooks === true;
+    startTrace();
+    if (traceStarted && traceOptions.javaHooks) installOptionalJavaHooks();
+} };
 const scannedModules = new Set();
 
 
@@ -244,9 +253,9 @@ function setupRustVmHooksAndDecryptStrings(mod, rxRanges, blCallers, blTargetsSe
     runtimeHints.rustStrStub = stubOff;
     runtimeHints.rustStrWrap = wrapOff;
 
-    console.log(`${LOG_PREFIX} [Rust Bytecode VM] Dispatcher @ ${vmDispAddr} (offset ${dispOff})`);
-    console.log(`${LOG_PREFIX} [Rust String VM]   VM Stub    @ ${strStubAddr} (offset ${stubOff})`);
-    console.log(`${LOG_PREFIX} [Rust String Wrap] Wrapper    @ ${strWrapAddr} (offset ${wrapOff}, ${bestCallerCount} callsites)`);
+    console.log(`${LOG_PREFIX} [VM Bytecode VM] Dispatcher @ ${vmDispAddr} (offset ${dispOff})`);
+    console.log(`${LOG_PREFIX} [VM String VM]   VM Stub    @ ${strStubAddr} (offset ${stubOff})`);
+    console.log(`${LOG_PREFIX} [VM String Wrap] Wrapper    @ ${strWrapAddr} (offset ${wrapOff}, ${bestCallerCount} callsites)`);
 
     // 2b. Check for an indirect descriptor-table string thunk (e.g. `ldp x9, x1, [x0]; ldr w2, [x0, #0x10]; mov x0, x9; b #strWrapAddr`).
     const descThunkSet = new Set();
@@ -268,7 +277,7 @@ function setupRustVmHooksAndDecryptStrings(mod, rxRanges, blCallers, blTargetsSe
                                 const thunkAddr = rBase.add(thunkIdx * 4);
                                 descThunkSet.add(thunkAddr.toString());
                                 console.log(
-                                    `${LOG_PREFIX} [Rust String Desc] Thunk      @ ${thunkAddr} (offset 0x${thunkAddr.sub(base).toString(16)})`
+                                    `${LOG_PREFIX} [VM String Desc] Thunk      @ ${thunkAddr} (offset 0x${thunkAddr.sub(base).toString(16)})`
                                 );
                                 break;
                             }
@@ -416,7 +425,7 @@ function setupRustVmHooksAndDecryptStrings(mod, rxRanges, blCallers, blTargetsSe
                             text.startsWith('com.')
                         ) {
                             console.log(
-                                `${LOG_PREFIX} [Decrypted VM Str]  rodata=${relOff} len=${w1Len} key=0x${w2Key.toString(16).padStart(8, '0')} -> "${text}"`
+                                `${LOG_PREFIX} [Decrypted VM Str] [decoder-invoked] module=${mod.name} rodata=${relOff} len=${w1Len} key=0x${w2Key.toString(16).padStart(8, '0')} -> "${text}"`
                             );
                         }
                     } catch (e) {
@@ -440,6 +449,9 @@ function setupRustVmHooksAndDecryptStrings(mod, rxRanges, blCallers, blTargetsSe
             }
         }
     }
+
+    // String recovery above is independent of the legacy bypass/proof routines below.
+    if (!legacyProof) return true;
 
     // 4. Attach runtime filter on strStubAddr to sanitize anti-Frida/emulator needle strings in-place.
     const sanitizedNeedles = new Set([
@@ -538,23 +550,23 @@ function setupRustVmHooksAndDecryptStrings(mod, rxRanges, blCallers, blTargetsSe
 
     if (assetOrchFn) {
         runtimeHints.rustAssetOrch = `0x${assetOrchFn.sub(base).toString(16)}`;
-        console.log(`${LOG_PREFIX} [Rust Asset+DCL]   Orchestrator @ ${assetOrchFn} (offset ${runtimeHints.rustAssetOrch})`);
+        console.log(`${LOG_PREFIX} [VM Asset+DCL]   Orchestrator @ ${assetOrchFn} (offset ${runtimeHints.rustAssetOrch})`);
     }
     if (innerAssetOrchFn) {
         const innerOff = `0x${innerAssetOrchFn.sub(base).toString(16)}`;
-        console.log(`${LOG_PREFIX} [Rust Asset+DCL]   Inner Pipe   @ ${innerAssetOrchFn} (offset ${innerOff})`);
+        console.log(`${LOG_PREFIX} [VM Asset+DCL]   Inner Pipe   @ ${innerAssetOrchFn} (offset ${innerOff})`);
     }
     if (assetOpenFn) {
         runtimeHints.rustAssetOpen = `0x${assetOpenFn.sub(base).toString(16)}`;
-        console.log(`${LOG_PREFIX} [Rust Asset Open]  JNI Helper   @ ${assetOpenFn} (offset ${runtimeHints.rustAssetOpen})`);
+        console.log(`${LOG_PREFIX} [VM Asset Open]  JNI Helper   @ ${assetOpenFn} (offset ${runtimeHints.rustAssetOpen})`);
     }
     if (dclExecFn) {
         runtimeHints.rustDclExec = `0x${dclExecFn.sub(base).toString(16)}`;
-        console.log(`${LOG_PREFIX} [Rust DCL Loader]  InMemoryDCL  @ ${dclExecFn} (offset ${runtimeHints.rustDclExec})`);
+        console.log(`${LOG_PREFIX} [VM DCL Loader]  InMemoryDCL  @ ${dclExecFn} (offset ${runtimeHints.rustDclExec})`);
     }
     if (stateStepFn) {
         runtimeHints.rustStateStep = `0x${stateStepFn.sub(base).toString(16)}`;
-        console.log(`${LOG_PREFIX} [Rust State Mach]  Step Driver  @ ${stateStepFn} (offset ${runtimeHints.rustStateStep})`);
+        console.log(`${LOG_PREFIX} [VM State Mach]  Step Driver  @ ${stateStepFn} (offset ${runtimeHints.rustStateStep})`);
     }
 
     // 6. Discover and bypass all anti-analysis / anti-Frida / anti-emulator gates in stateStepFn + watchdog.
@@ -785,7 +797,7 @@ function setupRustVmHooksAndDecryptStrings(mod, rxRanges, blCallers, blTargetsSe
                 flagJsonKey = extractedKeys[1];
                 cipherJsonKey = extractedKeys[2];
                 console.log(
-                    `${LOG_PREFIX} [Rust JSON Schema] Extracted keys: outer="${outerJsonKey}" (${outerIsArray ? 'Array' : 'Object'}), flag="${flagJsonKey}", key="${cipherJsonKey}" (len=${expectedKeyLen})`
+                    `${LOG_PREFIX} [VM JSON Schema] Extracted keys: outer="${outerJsonKey}" (${outerIsArray ? 'Array' : 'Object'}), flag="${flagJsonKey}", key="${cipherJsonKey}" (len=${expectedKeyLen})`
                 );
             }
         } catch (e) {
@@ -927,8 +939,107 @@ function setupRustVmHooksAndDecryptStrings(mod, rxRanges, blCallers, blTargetsSe
     return true;
 }
 
+// Pure recovery of the reviewed lowbias32/ciphertext-feedback string VM.
+// Arguments come from ARM64 callsites, not a package/offset table. No app code is called.
+function decodeFeedbackString(bytes, key) {
+    let state = key >>> 0;
+    let text = '';
+    for (let i = 0; i < bytes.length; i++) {
+        state = Math.imul(state ^ (state >>> 16), 0x7feb352d) >>> 0;
+        state = Math.imul(state ^ (state >>> 15), 0x846ca68b) >>> 0;
+        state = (state ^ (state >>> 16)) >>> 0;
+        text += String.fromCharCode(bytes[i] ^ (state >>> 24));
+        state = (state + 0x9e3779b9 + bytes[i]) >>> 0;
+    }
+    return text;
+}
+
+function recoverVmCallArguments(words, index, rangeBase) {
+    const regs = new Array(32).fill(null);
+    for (let j = Math.max(0, index - 24); j < index; j++) {
+        const w = words[j], rd = w & 31, rn = (w >>> 5) & 31;
+        const pc = rangeBase + j * 4;
+        const adr = (w & 0x9f000000) >>> 0;
+        if (adr === 0x10000000 || adr === 0x90000000) {
+            let imm = (((w >>> 5) & 0x7ffff) << 2) | ((w >>> 29) & 3);
+            if (imm & 0x100000) imm -= 0x200000;
+            regs[rd] = adr === 0x90000000 ? Math.floor(pc / 4096) * 4096 + imm * 4096 : pc + imm;
+        } else if (((w & 0xff800000) >>> 0) === 0x91000000) {
+            regs[rd] = regs[rn] === null ? null : regs[rn] + ((w >>> 10) & 0xfff) * ((w >>> 22) & 1 ? 4096 : 1);
+        } else if (((w & 0xffe0ffe0) >>> 0) === 0xaa0003e0) {
+            regs[rd] = regs[(w >>> 16) & 31];
+        } else if (((w & 0x7f800000) >>> 0) === 0x52800000) {
+            const shift = ((w >>> 21) & 3) * 16;
+            regs[rd] = shift > 16 ? null : (((w >>> 5) & 0xffff) * Math.pow(2, shift)) >>> 0;
+        } else if (((w & 0x7f800000) >>> 0) === 0x72800000) {
+            const shift = ((w >>> 21) & 3) * 16;
+            regs[rd] = shift > 16 || regs[rd] === null ? null :
+                ((regs[rd] & ~(0xffff << shift)) | (((w >>> 5) & 0xffff) << shift)) >>> 0;
+        } else if ((w >>> 26) === 0x25 || ((w & 0xfffffc1f) >>> 0) === 0xd63f0000) {
+            // A previous call invalidates caller-saved values; never recycle its arguments.
+            for (let r = 0; r < 19; r++) regs[r] = null;
+        } else if ((w >>> 26) === 0x05 || ((w & 0xff000010) >>> 0) === 0x54000000 ||
+                   ((w & 0x7e000000) >>> 0) === 0x34000000 ||
+                   ((w & 0x7e000000) >>> 0) === 0x36000000) {
+            // Do not pretend to resolve arguments across unknown control flow.
+            regs.fill(null);
+        } else if ((w & 0x0a000000) === 0x08000000) {
+            // Loads overwrite destinations. Stores do not (except writeback, unsupported here).
+            if (w & 0x00400000) {
+                regs[rd] = null;
+                if ((w & 0x3a000000) === 0x28000000) regs[(w >>> 10) & 31] = null;
+            }
+        } else if ((w & 0x1c000000) === 0x10000000 || (w & 0x0e000000) === 0x0a000000) {
+            regs[rd] = null; // unmodelled integer operation
+        }
+    }
+    return regs.slice(0, 3);
+}
+
+function recoverFeedbackVmStrings(mod, rxRanges) {
+    const moduleBase = Number(mod.base.toString()), moduleEnd = moduleBase + mod.size;
+    const groups = new Map();
+    for (const range of rxRanges) {
+        const words = range.u32, rangeBase = Number(range.base.toString());
+        for (let i = 0; i < words.length; i++) {
+            const w = words[i];
+            if ((w >>> 26) !== 0x25) continue;
+            const [address, length, key] = recoverVmCallArguments(words, i, rangeBase);
+            if (address === null || length === null || key === null || length < 4 || length > 8192 ||
+                address < moduleBase || address + length > moduleEnd) continue;
+            let imm = w & 0x3ffffff;
+            if (imm & 0x2000000) imm -= 0x4000000;
+            const callee = rangeBase + (i + imm) * 4;
+            if (callee < moduleBase || callee >= moduleEnd) continue;
+            try {
+                const bytes = new Uint8Array(ptr(address).readByteArray(length));
+                const text = decodeFeedbackString(bytes, key);
+                if (!/^[\x20-\x7e]+$/.test(text)) continue;
+                let group = groups.get(callee);
+                if (!group) { group = new Map(); groups.set(callee, group); }
+                group.set(address + ':' + length + ':' + key, { address, length, key, text, site: rangeBase + i * 4 });
+            } catch (_) { /* Unmapped or unreadable source: skip. */ }
+        }
+    }
+    let recovered = 0;
+    for (const [callee, group] of groups) {
+        const strings = Array.from(group.values());
+        // Demand multiple independently decoded long strings and a Java class/signature.
+        // Random printable short bytes and selector constants are not VM evidence.
+        if (strings.filter(x => x.length >= 12).length < 3 ||
+            !strings.some(x => /^(?:java\/|dalvik\/|android\/|\(.*\)L)/.test(x.text))) continue;
+        console.log(`${LOG_PREFIX} [VM string decoder] ${mod.name}+0x${(callee - moduleBase).toString(16)} transform=lowbias32-feedback recovered=${strings.length}`);
+        for (const item of strings) {
+            recovered++;
+            if (!/ClassLoader|DexFile|DexPathList|ByteBuffer|loadClass|loadDex|loadRes|getAssets|getClassLoader|AssetManager|\.cfg$|\.dat$|\.enc$|^https?:|^com[./]|^\(/.test(item.text)) continue;
+            console.log(`${LOG_PREFIX} [Decrypted VM Str] [static-recovered] module=${mod.name} callsite=0x${(item.site - moduleBase).toString(16)} rodata=0x${(item.address - moduleBase).toString(16)} len=${item.length} key=0x${item.key.toString(16)} -> ${JSON.stringify(item.text)}`);
+        }
+    }
+    return recovered;
+}
+
 function inspectMappedNativeVmModule(mod) {
-    if (!legacyProof || Process.arch !== 'arm64' || !mod || !isCandidateAppModule(mod)) return;
+    if (!traceOptions.decodeVm || Process.arch !== 'arm64' || !mod || !isCandidateAppModule(mod)) return;
     const moduleKey = mod.path + '@' + mod.base;
     if (scannedModules.has(moduleKey)) return;
     scannedModules.add(moduleKey);
@@ -975,6 +1086,9 @@ function inspectMappedNativeVmModule(mod) {
                 }
             }
         }
+
+        const recovered = recoverFeedbackVmStrings(mod, rxRanges);
+        if (recovered > 0 && !legacyProof) return;
 
         // Pass 2: Scan for JSON selector decoders, SplitMix64 VM dispatchers/evaluators, and ChaCha20 decryptors.
         for (let r = 0; r < rxRanges.length; r++) {
@@ -1031,7 +1145,7 @@ function inspectMappedNativeVmModule(mod) {
         }
 
 
-        logBanner(`SIGNAL: NATIVE ELF VM & CLASSLOADER REFLECTION IN ${mod.name}`);
+        logBanner(`SCANNING NATIVE VM DECODER CANDIDATES IN ${mod.name}`);
         runtimeHints.soName = mod.name;
 
         if (Process.arch === 'arm64') {
@@ -1156,7 +1270,7 @@ function inspectMappedNativeVmModule(mod) {
                                 if (strLen >= 1 && strLen <= 100) {
                                     const text = strBuf.readUtf8String(strLen);
                                     console.log(
-                                        `${LOG_PREFIX} [Decrypted VM Slot] slot=0x${slot.toString(16)} (dyn_key=0x${key.toString(16).padStart(8, '0')}) -> "${text}"`
+                                        `${LOG_PREFIX} [Decrypted VM Slot] [decoder-invoked] module=${mod.name} slot=0x${slot.toString(16)} (dyn_key=0x${key.toString(16).padStart(8, '0')}) -> "${text}"`
                                     );
                                     break;
                                 }
@@ -1417,12 +1531,11 @@ function hookBridgeClassBySignatures(className) {
     });
 }
 
-function installJniTraceHooks() {
+function installJniTraceHooks(envHandle) {
     if (jniHooked) return;
     jniHooked = true;
 
-    const env = Java.vm.getEnv();
-    const handle = env.handle.readPointer();
+    const handle = envHandle.readPointer();
 
     const IDX_FIND_CLASS = 6;
     const IDX_GET_METHOD_ID = 33;
@@ -1439,37 +1552,6 @@ function installJniTraceHooks() {
     const registerNativesPtr = handle.add(IDX_REGISTER_NATIVES * Process.pointerSize).readPointer();
     const getStringRegionPtr = handle.add(IDX_GET_STRING_REGION * Process.pointerSize).readPointer();
     const getDirectBufAddrPtr = handle.add(IDX_GET_DIRECT_BUFFER_ADDRESS * Process.pointerSize).readPointer();
-
-    // Hook dlsym("JNI_OnLoad") so targetModule is set and scanned BEFORE JNI_OnLoad executes.
-    const dlsymPtr = findExportSafe('libdl.so', 'dlsym');
-    if (dlsymPtr) {
-        Interceptor.attach(dlsymPtr, {
-            onEnter(args) {
-                this.isJniOnLoad = false;
-                if (!args[1].isNull()) {
-                    try {
-                        if (args[1].readUtf8String() === 'JNI_OnLoad') {
-                            this.isJniOnLoad = true;
-                        }
-                    } catch (e) {
-                        // Ignore
-                    }
-                }
-            },
-            onLeave(retval) {
-                if (this.isJniOnLoad && !retval.isNull()) {
-                    const m = Process.findModuleByAddress(retval);
-                    if (isCandidateAppModule(m)) {
-                        targetModule = m;
-                        const onLoadOff = `0x${retval.sub(m.base).toString(16)}`;
-                        runtimeHints.entry = onLoadOff;
-                        console.log(`${LOG_PREFIX} Resolved JNI_OnLoad in ${m.name} @ ${retval} (offset ${onLoadOff})`);
-                        inspectMappedNativeVmModule(m);
-                    }
-                }
-            }
-        });
-    }
 
     Interceptor.attach(registerNativesPtr, {
         onEnter(args) {
@@ -1532,7 +1614,7 @@ function installJniTraceHooks() {
             const callerOff = `0x${ptr(this.returnAddress).sub(Process.findModuleByAddress(this.returnAddress).base).toString(16)}`;
             runtimeHints.jniCallers[name] = callerOff;
             console.log(`${LOG_PREFIX} [Native JNIEnv->GetStaticMethodID]  ${name}${sig}${formatCallerOffset(this.returnAddress)}`);
-            if (sig.indexOf('Landroid/content/Context;') !== -1 && bridgeClassName) {
+            if (traceOptions.javaHooks && sig.indexOf('Landroid/content/Context;') !== -1 && bridgeClassName) {
                 installAssetHooks();
                 hookBridgeClassBySignatures(bridgeClassName);
             }
@@ -1558,7 +1640,7 @@ function installJniTraceHooks() {
                     str.endsWith('.dat') ||
                     str.endsWith('.enc') ||
                     str.startsWith('https://') ||
-                    str === rustTargetClassName
+                    str === rustTargetClassName || /ClassLoader|DexFile|ByteBuffer|loadClass/.test(str)
                 ) {
                     console.log(`${LOG_PREFIX} [Native JNIEnv->NewStringUTF]       "${str}"${formatCallerOffset(this.returnAddress)}`);
                 }
@@ -1662,34 +1744,15 @@ function describeLoader(loader) {
     catch (_) { return loader.$className || '<unavailable>'; }
 }
 
-function snapshotClassLoaders(reason) {
-    console.log(`${LOG_PREFIX} [ClassLoader snapshot] ${reason} (inventory, not proof of a new load)`);
-    try {
-        Java.enumerateClassLoaders({
-            onMatch(loader) {
-                console.log(`${LOG_PREFIX} [ClassLoader] ${describeLoader(loader)}`);
-                try {
-                    const base = Java.cast(loader, Java.use('dalvik.system.BaseDexClassLoader'));
-                    const elements = base.pathList.value.dexElements.value;
-                    for (let i = 0; i < elements.length; i++) {
-                        console.log(`${LOG_PREFIX} [dexElements ${i}] ${elements[i]}`);
-                    }
-                } catch (_) { /* Boot/custom loaders need not have a DexPathList. */ }
-            },
-            onComplete() { console.log(`${LOG_PREFIX} [ClassLoader snapshot complete] ${reason}`); }
-        });
-    } catch (e) { console.log(`${LOG_PREFIX} [Snapshot unavailable] ${e}`); }
-}
-
 function installClassLoaderHooks() {
-    for (const name of ['dalvik.system.BaseDexClassLoader', 'dalvik.system.PathClassLoader',
-        'dalvik.system.DexClassLoader', 'dalvik.system.InMemoryDexClassLoader',
+    for (const name of ['dalvik.system.DexClassLoader', 'dalvik.system.InMemoryDexClassLoader',
         'dalvik.system.DelegateLastClassLoader']) {
         try {
             const cls = Java.use(name);
             for (const ov of cls.$init.overloads) {
                 ov.implementation = function () {
                     const args = Array.from(arguments);
+                    if (isInstalledApkPath(args[0])) return ov.apply(this, args);
                     const signature = ov.argumentTypes.map(t => t.className).join(', ');
                     console.log(`${LOG_PREFIX} [SIGNAL - ${name.split('.').pop()}] <init>(${signature})`);
                     args.forEach((arg, i) => {
@@ -1699,12 +1762,12 @@ function installClassLoaderHooks() {
                         } else if (type === '[Ljava.nio.ByteBuffer;') {
                             console.log(`${LOG_PREFIX} [DEX buffers] count=${arg ? arg.length : 0}`);
                         } else if (type === 'java.lang.String' || type === 'java.lang.ClassLoader') {
-                            console.log(`${LOG_PREFIX} [Loader argument ${i}] ${brief(arg)}`);
+                            if (type === 'java.lang.String') console.log(`${LOG_PREFIX} [Loader argument ${i}] ${brief(arg)}`);
                         }
                     });
                     try {
                         const result = ov.apply(this, args);
-                        console.log(`${LOG_PREFIX} [ClassLoader constructed] ${describeLoader(this)}`);
+                        console.log(`${LOG_PREFIX} [ClassLoader constructed] ${this.$className}`);
                         return result;
                     } catch (e) {
                         console.log(`${LOG_PREFIX} [ClassLoader constructor threw] ${e}`);
@@ -1722,7 +1785,7 @@ function installClassLoaderHooks() {
             const name = String(args[0]);
             const kind = this.$className || '';
             const relevant = /(?:InMemoryDex|Dex|DelegateLast)ClassLoader$/.test(kind) || name === rustTargetClassName;
-            if (relevant) console.log(`${LOG_PREFIX} [SIGNAL - DCL loadClass] "${name}" via ${describeLoader(this)}`);
+            if (relevant) console.log(`${LOG_PREFIX} [SIGNAL - DCL loadClass] "${name}" via ${this.$className}`);
             if (legacyProof && inSyntheticDcl && name === rustTargetClassName) return null;
             try {
                 const result = ov.apply(this, args);
@@ -1736,11 +1799,12 @@ function installClassLoaderHooks() {
     }
     // File-backed DEX and additions to an existing PathClassLoader bypass constructors.
     for (const [className, method] of [['dalvik.system.DexFile', 'loadDex'],
-        ['dalvik.system.DexFile', '$init'], ['dalvik.system.BaseDexClassLoader', 'addDexPath']]) {
+        ['dalvik.system.BaseDexClassLoader', 'addDexPath']]) {
         try {
             const cls = Java.use(className);
             for (const ov of cls[method].overloads) {
                 ov.implementation = function () {
+                    if (isInstalledApkPath(arguments[0])) return ov.apply(this, arguments);
                     console.log(`${LOG_PREFIX} [SIGNAL - ${className}.${method}] ${Array.from(arguments).map((arg, i) => ov.argumentTypes[i].className.startsWith('[') ? ov.argumentTypes[i].className + '[count=' + (arg ? arg.length : 0) + ']' : brief(arg)).join(', ')}`);
                     return ov.apply(this, arguments);
                 };
@@ -1750,73 +1814,138 @@ function installClassLoaderHooks() {
     console.log(`${LOG_PREFIX} [Ready] Class-loader hooks installed`);
 }
 
+function isInstalledApkPath(value) {
+    if (typeof value !== 'string' && !(value && value.$className === 'java.lang.String')) return false;
+    const paths = String(value).split(':');
+    return paths.length > 0 && paths.every(path =>
+        /^(?:\/data\/app\/|\/system\/|\/system_ext\/|\/apex\/|\/product\/)/.test(path) &&
+        /\.(?:apk|jar)$/.test(path));
+}
+
 let moduleObserver = null;
+const onLoadHooks = new Set();
+function withNativeEnv(vm, attach, callback) {
+    const table = vm.readPointer();
+    const out = Memory.alloc(Process.pointerSize);
+    const getEnv = new NativeFunction(table.add(6 * Process.pointerSize).readPointer(), 'int', ['pointer', 'pointer', 'int']);
+    let status = getEnv(vm, out, 0x00010006);
+    let attached = false;
+    if (status === -2 && attach) {
+        const attachThread = new NativeFunction(table.add(4 * Process.pointerSize).readPointer(), 'int', ['pointer', 'pointer', 'pointer']);
+        status = attachThread(vm, out, ptr(0));
+        attached = status === 0;
+    }
+    try {
+        if (status === 0) callback(out.readPointer());
+        else console.log(`${LOG_PREFIX} [JNI pending] GetEnv=${status}`);
+    } finally {
+        if (attached) new NativeFunction(table.add(5 * Process.pointerSize).readPointer(), 'int', ['pointer'])(vm);
+    }
+}
+
+function installNativeJniFromVm(vm, attach = false) {
+    if (jniHooked) return;
+    try { withNativeEnv(vm, attach, installJniTraceHooks); }
+    catch (e) { console.log(`${LOG_PREFIX} [JNI unavailable] ${e}`); }
+}
+
+function hookNativeOnLoad(mod, address) {
+    const key = address.toString();
+    if (onLoadHooks.has(key)) return;
+    onLoadHooks.add(key);
+    Interceptor.attach(address, {
+        onEnter(args) {
+            targetModule = mod;
+            installNativeJniFromVm(args[0]);
+            console.log(`${LOG_PREFIX} [JNI_OnLoad] ${mod.name}+${address.sub(mod.base)}`);
+            inspectMappedNativeVmModule(mod);
+        }
+    });
+}
+
 function installModuleObserver() {
-    if (moduleObserver) return;
     const seen = new Set();
     function observe(mod) {
         if (!isCandidateAppModule(mod)) return;
         const key = mod.path + '@' + mod.base;
         if (seen.has(key)) return;
         seen.add(key);
-        console.log(`${LOG_PREFIX} [Native module] ${mod.name} @ ${mod.base} size=${mod.size} path=${mod.path}`);
-        // Keep the legacy decoder on its original JNI_OnLoad/loadLibrary timing.
+        const entry = mod.findExportByName('JNI_OnLoad');
+        if (!entry) return;
+        try { hookNativeOnLoad(mod, entry); }
+        catch (e) { console.log(`${LOG_PREFIX} [Native hook unavailable] ${mod.name}: ${e}`); }
+        // Late attach support; defer work outside the linker's module notification.
+        setImmediate(() => inspectMappedNativeVmModule(mod));
     }
     if (typeof Process.attachModuleObserver === 'function') {
-        moduleObserver = Process.attachModuleObserver({ onAdded: observe });
+        moduleObserver = Process.attachModuleObserver({ onAdded(mod) { setImmediate(() => observe(mod)); } });
     } else {
         Process.enumerateModules().forEach(observe);
         moduleObserver = setInterval(() => Process.enumerateModules().forEach(observe), 1000);
     }
-}
-
-function initTrace() {
-    runInJavaVm(() => {
-        installAssetHooks();
-        try { installJniTraceHooks(); }
-        catch (e) { console.log(`${LOG_PREFIX} [Hook unavailable] JNI: ${e}`); }
-        installModuleObserver();
-        Java.perform(() => snapshotClassLoaders('initial'));
-        [3000, 10000].forEach(delay => setTimeout(() => {
-            Java.perform(() => snapshotClassLoaders(`after ${delay}ms`));
-        }, delay));
-
-        const Runtime = Java.use('java.lang.Runtime');
-        Runtime.loadLibrary0.overloads.forEach((ov) => {
-            ov.implementation = function () {
-                const libName = String(arguments[arguments.length - 1]);
-                let callerClsName = null;
-                for (let i = 0; i < arguments.length - 1; i++) {
-                    const arg = arguments[i];
-                    if (arg && typeof arg.getName === 'function') {
-                        callerClsName = arg.getName();
-                    }
-                }
-
-                const ret = ov.apply(this, arguments);
-
-                if (!handledLibs.has(libName)) {
-                    const soName = `lib${libName}.so`;
-                    const mod = Process.findModuleByName(soName);
-                    if (mod && isCandidateAppModule(mod)) {
-                        handledLibs.add(libName);
-                        if (callerClsName && !bridgeClassName) {
-                            bridgeClassName = callerClsName;
-                        }
-                        targetModule = mod;
-                        console.log(`${LOG_PREFIX} Runtime.loadLibrary0("${libName}") called by ${callerClsName || bridgeClassName}`);
-                        console.log(`${LOG_PREFIX} Target native library mapped: ${mod.name} @ ${mod.base} (size: 0x${mod.size.toString(16)})`);
-                        inspectMappedNativeVmModule(mod);
-                    }
-                }
-
-                return ret;
-            };
-        });
+    // Also catch dlsym-based JNI lookup before the app enters JNI_OnLoad.
+    const dlsym = findExportSafe('libdl.so', 'dlsym');
+    if (dlsym) Interceptor.attach(dlsym, {
+        onEnter(args) {
+            this.onLoad = false;
+            try { this.onLoad = args[1].readUtf8String() === 'JNI_OnLoad'; } catch (_) {}
+        },
+        onLeave(result) {
+            if (!this.onLoad || result.isNull()) return;
+            const mod = Process.findModuleByAddress(result);
+            if (isCandidateAppModule(mod)) hookNativeOnLoad(mod, result);
+        }
     });
 }
 
-setImmediate(() => {
-    logBanner(`STARTING NATIVE ASSET & CLASSLOADER TRACE (legacyProof=${legacyProof})`);
-    initTrace();
-});
+function installExistingVmHooks() {
+    if (jniHooked) return;
+    const getVms = findExportSafe('libart.so', 'JNI_GetCreatedJavaVMs');
+    if (!getVms) return;
+    try {
+        const vmOut = Memory.alloc(Process.pointerSize);
+        const count = Memory.alloc(4);
+        const status = new NativeFunction(getVms, 'int', ['pointer', 'int', 'pointer'])(vmOut, 1, count);
+        if (status === 0 && count.readS32() > 0) installNativeJniFromVm(vmOut.readPointer(), true);
+    } catch (e) { console.log(`${LOG_PREFIX} [Existing VM unavailable] ${e}`); }
+}
+
+function initTrace() {
+    console.log(`${LOG_PREFIX} [Environment] Frida=${typeof Frida !== 'undefined' ? Frida.version : 'unknown'} arch=${Process.arch} pointerSize=${Process.pointerSize}`);
+    if (Process.arch !== 'arm64') console.log(`${LOG_PREFIX} [Coverage] VM instruction decoder requires native ARM64; JNI string observation remains enabled. Translated ARM code is not supported.`);
+    installModuleObserver();
+    setTimeout(installExistingVmHooks, 1000);
+    console.log(`${LOG_PREFIX} [Ready] Native tracing installed; decodeVm=${traceOptions.decodeVm}; javaHooks=${traceOptions.javaHooks}`);
+    installOptionalJavaHooks();
+}
+
+let javaHooksScheduled = false;
+function installOptionalJavaHooks() {
+    if (!traceOptions.javaHooks || javaHooksScheduled) return;
+    javaHooksScheduled = true;
+    if (typeof Java === 'undefined') {
+        console.log(`${LOG_PREFIX} [Java unavailable] Use the Frida CLI or bundle frida-java-bridge. Native tracing is active.`);
+        return;
+    }
+    // Never perform synchronous Java bridge initialization before native setup.
+    setTimeout(() => {
+        console.log(`${LOG_PREFIX} [Java pending] Waiting for Java.perform`);
+        try {
+            Java.perform(() => {
+                installAssetHooks();
+                console.log(`${LOG_PREFIX} [Java ready] Focused DCL hooks installed`);
+            });
+        } catch (e) { console.log(`${LOG_PREFIX} [Java unavailable] ${e}`); }
+    }, 250);
+}
+
+let traceStarted = false;
+function startTrace() {
+    if (traceStarted) return;
+    traceStarted = true;
+    logBanner('STARTING NATIVE VM STRING & ASSET TRACE');
+    try { initTrace(); }
+    catch (e) { console.log(`${LOG_PREFIX} [Startup error] ${e.stack || e}`); }
+}
+// CLI/Gadget calls init with parameters. Raw create_script users get the same defaults.
+setImmediate(() => setTimeout(startTrace, 100));
